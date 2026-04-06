@@ -91,6 +91,35 @@ body{
 @keyframes popIn{0%{transform:scale(.3);opacity:.3}100%{transform:scale(1);opacity:1}}
 @keyframes pulse{0%,100%{opacity:.7}50%{opacity:1}}
 .pulsing{animation:pulse 1.2s infinite;}
+/* ── 기보 패널 ── */
+#game-row{display:flex;gap:14px;align-items:flex-start;}
+#move-history-panel{
+  background:rgba(0,0,0,.48);border:1px solid rgba(200,160,80,.18);
+  border-radius:10px;padding:12px 10px;width:148px;
+  display:flex;flex-direction:column;gap:8px;
+}
+#mh-title{font-size:11px;color:#c8a060;letter-spacing:2px;text-align:center;padding-bottom:6px;border-bottom:1px solid rgba(200,160,80,.12);}
+#move-list{
+  overflow-y:auto;max-height:490px;display:flex;flex-direction:column;gap:1px;
+  scrollbar-width:thin;scrollbar-color:rgba(200,160,80,.2) transparent;
+}
+#move-list::-webkit-scrollbar{width:4px;}
+#move-list::-webkit-scrollbar-thumb{background:rgba(200,160,80,.2);border-radius:2px;}
+.mv{display:flex;gap:4px;align-items:center;padding:3px 4px;border-radius:3px;font-size:10.5px;}
+.mv:nth-child(even){background:rgba(255,255,255,.03);}
+.mv-n{color:#4a4065;min-width:20px;text-align:right;font-size:9.5px;}
+.mv-s{width:13px;text-align:center;font-size:11px;}
+.mv-p{color:#d8c8a8;letter-spacing:.5px;min-width:30px;font-weight:600;}
+.mv-w{color:#5a5075;font-size:9px;margin-left:auto;}
+.mv.ai-move .mv-p{color:#9090d0;}
+#copy-toast{font-size:9px;color:#70c070;text-align:center;min-height:11px;transition:opacity .4s;}
+#btn-copy{
+  background:rgba(200,160,80,.1);border:1px solid rgba(200,160,80,.22);
+  border-radius:14px;color:#b8a070;font-size:10px;padding:7px 0;
+  cursor:pointer;letter-spacing:1px;transition:all .15s;font-family:inherit;width:100%;
+}
+#btn-copy:hover{background:rgba(200,160,80,.22);color:#c8b080;}
+#btn-copy:active{transform:scale(.96);}
 </style>
 </head>
 <body>
@@ -130,14 +159,22 @@ body{
   </div>
   <div id="status">대기 중...</div>
   <div id="vcf-badge">⚡ VCF/VCT 강제승 수순 발견</div>
-  <div class="board-wrap">
-    <div class="col-labels" id="col-labels"></div>
-    <div class="board-row-wrap">
-      <div class="row-labels" id="row-labels"></div>
-      <div id="board-svg-wrap">
-        <svg id="board-svg"></svg>
-        <div id="board-grid"></div>
+  <div id="game-row">
+    <div class="board-wrap">
+      <div class="col-labels" id="col-labels"></div>
+      <div class="board-row-wrap">
+        <div class="row-labels" id="row-labels"></div>
+        <div id="board-svg-wrap">
+          <svg id="board-svg"></svg>
+          <div id="board-grid"></div>
+        </div>
       </div>
+    </div>
+    <div id="move-history-panel">
+      <div id="mh-title">기 보</div>
+      <div id="move-list"></div>
+      <div id="copy-toast"></div>
+      <button id="btn-copy">복사</button>
     </div>
   </div>
   <div class="controls">
@@ -771,8 +808,10 @@ self.onmessage=function(e){
 // ══════════════════════════════════════════════════
 const BS=15,DIRS=[[0,1],[1,0],[1,1],[1,-1]];
 const DEPTH=10,TIME_LIMIT=5000;
+const COL_STR='ABCDEFGHJKLMNOP';
 let board,isPlayerTurn,winner,lastMove,moveCount,winnerStones,thinkStart;
 let PLAYER,AI_PLAYER,worker;
+let moveHistory=[];
 
 function countLine(b,r,c,dr,dc,p){
   let n=1,oA=0,oB=0;
@@ -838,6 +877,43 @@ function getForbiddenCells(){
   return s;
 }
 
+function posStr(r,c){return COL_STR[c]+(BS-r);}
+
+function renderMoveHistory(){
+  const list=document.getElementById('move-list');
+  list.innerHTML='';
+  for(const m of moveHistory){
+    const div=document.createElement('div');
+    div.className='mv'+(m.who==='AI'?' ai-move':'');
+    const isBlack=m.stone===1;
+    div.innerHTML=
+      '<span class="mv-n">'+m.num+'</span>'+
+      '<span class="mv-s">'+(isBlack?'⚫':'⚪')+'</span>'+
+      '<span class="mv-p">'+m.pos+'</span>'+
+      '<span class="mv-w">'+m.who+'</span>';
+    list.appendChild(div);
+  }
+  list.scrollTop=list.scrollHeight;
+}
+
+function copyHistory(){
+  const pName=PLAYER===1?'흑':'백';
+  const aiName=AI_PLAYER===1?'흑':'백';
+  let txt='=== 오목 기보 ===\n';
+  txt+='나('+pName+') vs AI('+aiName+')\n\n';
+  for(const m of moveHistory){
+    const isBlack=m.stone===1;
+    txt+=String(m.num).padStart(2)+'. '+(isBlack?'⚫':'⚪')+' '+m.pos.padEnd(4)+' ['+m.who+']\n';
+  }
+  if(winner==='P')txt+='\n결과: 당신 승리';
+  else if(winner==='AI')txt+='\n결과: AI 승리';
+  navigator.clipboard.writeText(txt).then(()=>{
+    const t=document.getElementById('copy-toast');
+    t.textContent='복사됨!';t.style.opacity='1';
+    setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.textContent='',400);},1500);
+  });
+}
+
 function createWorker(){
   if(worker)worker.terminate();
   const blob=new Blob([AI_CODE],{type:'application/javascript'});
@@ -846,11 +922,12 @@ function createWorker(){
     const{move:[ar,ac],vcf}=e.data;
     document.getElementById('think-time').textContent='AI: '+((Date.now()-thinkStart)/1000).toFixed(1)+'초';
     board[ar][ac]=AI_PLAYER;lastMove=[ar,ac];moveCount++;
+    moveHistory.push({num:moveCount,who:'AI',stone:AI_PLAYER,pos:posStr(ar,ac)});
     const vcfEl=document.getElementById('vcf-badge');
     if(vcf){vcfEl.style.visibility='visible';setTimeout(()=>vcfEl.style.visibility='hidden',4000);}
     const ws=getWinStones(board,ar,ac,AI_PLAYER);
     if(ws){winner='AI';winnerStones=ws;}else isPlayerTurn=true;
-    render();setStatus();
+    render();setStatus();renderMoveHistory();
   };
 }
 
@@ -916,9 +993,10 @@ function handleClick(r,c){
     if(fb){setStatus('🚫 금수! ('+fb+')','forbidden');setTimeout(()=>setStatus(),1500);return;}
   }
   board[r][c]=PLAYER;lastMove=[r,c];moveCount++;
+  moveHistory.push({num:moveCount,who:'나',stone:PLAYER,pos:posStr(r,c)});
   const ws=getWinStones(board,r,c,PLAYER);
-  if(ws){winner='P';winnerStones=ws;render();setStatus();return;}
-  isPlayerTurn=false;render();setStatus();
+  if(ws){winner='P';winnerStones=ws;render();setStatus();renderMoveHistory();return;}
+  isPlayerTurn=false;render();setStatus();renderMoveHistory();
   thinkStart=Date.now();
   worker.postMessage({board:board.map(x=>[...x]),depth:DEPTH,aiPlayer:AI_PLAYER,timeLimitMs:TIME_LIMIT});
 }
@@ -926,8 +1004,10 @@ function handleClick(r,c){
 function resetGame(){
   board=Array(BS).fill(null).map(()=>Array(BS).fill(0));
   isPlayerTurn=true;winner=null;lastMove=null;moveCount=0;winnerStones=[];
+  moveHistory=[];renderMoveHistory();
   document.getElementById('think-time').textContent='';
   document.getElementById('vcf-badge').style.visibility='hidden';
+  document.getElementById('copy-toast').textContent='';
 
   if(AI_PLAYER===1){
     isPlayerTurn=false;
@@ -969,6 +1049,7 @@ function startGame(playerColor){
 }
 
 document.getElementById('btn-new').addEventListener('click',resetGame);
+document.getElementById('btn-copy').addEventListener('click',copyHistory);
 document.getElementById('btn-mode').addEventListener('click',()=>{
   if(worker)worker.terminate();
   document.getElementById('game-screen').style.display='none';
