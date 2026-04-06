@@ -246,9 +246,9 @@ function scoreThreats(t){
   if(t.open3>=2)            s+=500000;
   if(t.open4===1)s+=700000;
   if(t.four===1) s+=150000;
-  if(t.open3===1)s+=50000;  // open3 위협 가중치 강화
-  if(t.three>=1) s+=6000;
-  if(t.two>=1)   s+=600;
+  if(t.open3===1)s+=90000;  // open3 단독 위협 (2라인 형성 전 선차단)
+  if(t.three>=1) s+=8000;
+  if(t.two>=1)   s+=800;
   return s;
 }
 
@@ -316,7 +316,8 @@ function moveScore(b,r,c,isMax,aiP){
   tb[r][c]=me;const tMe=getThreats(tb,r,c,me);
   tb[r][c]=op;const tOp=getThreats(tb,r,c,op);
   tb[r][c]=0;
-  return scoreThreats(tMe)*2+scoreThreats(tOp);
+  // 공격·방어 균형: 상대 위협도 충분히 고려해 방어수가 탐색 우선순위에 오름
+  return scoreThreats(tMe)*1.5+scoreThreats(tOp)*1.3;
 }
 
 // ── VCF: 강제 연속 4 탐색 ──────────────────────────────────
@@ -392,8 +393,8 @@ function vcfSearch(b,atk,depth){
       // 수비하면서 4 이상 위협 동시 생성 → VCF 경로 무효
       const dt=getThreats(b,br,bc,def);
       if(dt.open4||dt.four){b[br][bc]=0;allFail=false;break;}
-      // 보드 전체 open3 누적 ≥ 2라인(신호 6+) → VCF 경로 무효
-      if(countBoardO3(b,def)>=6){b[br][bc]=0;allFail=false;break;}
+      // 보드 전체 open3 누적 ≥ 1.5라인(신호 5+) → VCF/VCT 경로 무효
+      if(countBoardO3(b,def)>=5){b[br][bc]=0;allFail=false;break;}
       const res=vcfSearch(b,atk,depth-1);
       b[br][bc]=0;
       if(!res){allFail=false;break;}
@@ -659,26 +660,38 @@ function getAIMove(b,maxDepth,aiP,timeLimitMs){
     b[r][c]=humanP;if(checkWin(b,r,c,humanP)){b[r][c]=0;return{move:[r,c],vcf:false};}b[r][c]=0;
   }
 
+  // 상대 단독 open4 즉각 차단 (1수 후 2방향 승리 가능 → AI 공격보다 우선)
+  for(const[r,c]of cands){
+    b[r][c]=humanP;const t=getThreats(b,r,c,humanP);b[r][c]=0;
+    if(t.open4>=1)return{move:[r,c],vcf:false};
+  }
+
   // AI 즉각 복수위협
   for(const[r,c]of cands){
     if(aiP===1&&isForbidden(b,r,c))continue;
     b[r][c]=aiP;const t=getThreats(b,r,c,aiP);b[r][c]=0;
     if(t.open4>=2||(t.open4>=1&&t.four>=1)||(t.open4>=1&&t.open3>=1)||t.four>=2)return{move:[r,c],vcf:false};
   }
-  // 상대 즉각 복수위협 방어 (양삼·4+3 포함)
+  // 상대 즉각 복수위협 방어 (양삼·4+3·단독four 포함)
   for(const[r,c]of cands){
     b[r][c]=humanP;const t=getThreats(b,r,c,humanP);b[r][c]=0;
-    if(t.open4>=2||(t.open4>=1&&t.four>=1)||(t.open4>=1&&t.open3>=1)||t.four>=2||(t.four>=1&&t.open3>=1)||t.open3>=2)return{move:[r,c],vcf:false};
+    if(t.four>=2||(t.four>=1&&t.open3>=1)||t.open3>=2)return{move:[r,c],vcf:false};
   }
 
-  // 상대 보드 누적 open3 위협: 기존 open3 존재시 추가 위협 즉각 차단 (양삼 분산 방어)
+  // 상대 보드 누적 위협 방어
   {
     const baseO3=countBoardO3(b,humanP);
-    if(baseO3>=3){ // 이미 1개 이상 open3 라인 존재
+    // 기존 open3 존재(≥1라인): 추가 open3·four 수 즉각 차단 (분산 양삼)
+    if(baseO3>=3){
       for(const[r,c]of cands){
         b[r][c]=humanP;const t=getThreats(b,r,c,humanP);b[r][c]=0;
         if(t.open3>=1||t.four>=1||t.open4>=1)return{move:[r,c],vcf:false};
       }
+    }
+    // 기존 위협 없어도 four+open3 or open4 만드는 수 차단
+    for(const[r,c]of cands){
+      b[r][c]=humanP;const t=getThreats(b,r,c,humanP);b[r][c]=0;
+      if(t.open4>=1||(t.four>=1&&t.open3>=1))return{move:[r,c],vcf:false};
     }
   }
 
