@@ -177,17 +177,45 @@ function checkWin(b,r,c,p){
 
 function isForbidden(b,r,c){
   const t=b.map(x=>[...x]);t[r][c]=1;
-  for(const[dr,dc]of DIRS){const{n}=countLine(t,r,c,dr,dc,1);if(n>=6)return true;}
+  for(const[dr,dc]of DIRS){const{n}=countLine(t,r,c,dr,dc,1);if(n>=6)return true;} // 장목: 연속만
   if(checkWin(t,r,c,1))return false;
   let f=0,th=0;
-  for(const[dr,dc]of DIRS){const{n,o}=countLine(t,r,c,dr,dc,1);if(n===4&&o>=1)f++;if(n===3&&o===2)th++;}
+  for(const[dr,dc]of DIRS){
+    const{n,o}=scanBest(t,r,c,dr,dc,1); // 끊긴 4·3 포함
+    if(n===4&&o>=1)f++;
+    if(n===3&&o===2)th++;
+  }
   return f>=2||th>=2;
+}
+
+// 끊긴 패턴 포함 최선 패턴 탐색 (XX_X, X_XX, XX_XX 등)
+function scanBest(b,r,c,dr,dc,p){
+  const line=[];
+  for(let d=-4;d<=4;d++){
+    const rr=r+dr*d,cc=c+dc*d;
+    if(rr<0||rr>=BS||cc<0||cc>=BS)line.push(-1);
+    else line.push(b[rr][cc]);
+  }
+  let bestN=0,bestO=0;
+  for(let s=0;s<=4;s++){
+    let mine=0,empty=0,bad=false;
+    for(let i=s;i<s+5;i++){
+      if(line[i]===p)mine++;
+      else if(line[i]===0)empty++;
+      else{bad=true;break;}
+    }
+    if(bad||mine+empty<5)continue;
+    const lo=s>0&&line[s-1]===0?1:0;
+    const ro=s+5<9&&line[s+5]===0?1:0;
+    if(mine>bestN||(mine===bestN&&lo+ro>bestO)){bestN=mine;bestO=lo+ro;}
+  }
+  return{n:bestN,o:bestO};
 }
 
 function getThreats(b,r,c,p){
   let five=0,open4=0,four=0,open3=0,three=0,two=0;
   for(const[dr,dc]of DIRS){
-    const{n,o}=countLine(b,r,c,dr,dc,p);
+    const{n,o}=scanBest(b,r,c,dr,dc,p);
     if(n>=5)five++;
     else if(n===4&&o===2)open4++;
     else if(n===4&&o===1)four++;
@@ -289,12 +317,24 @@ function getFourBlocks(b,p){
   for(let r=0;r<BS;r++)for(let c=0;c<BS;c++){
     if(b[r][c]!==p)continue;
     for(const[dr,dc]of DIRS){
-      const{n,o}=countLine(b,r,c,dr,dc,p);
-      if(n<4||o===0)continue;
-      // 앞 방향 빈칸
-      for(let d=1;d<BS;d++){const rr=r+dr*d,cc=c+dc*d;if(rr<0||rr>=BS||cc<0||cc>=BS)break;if(b[rr][cc]===p)continue;if(b[rr][cc]===0){blocks.add(rr*BS+cc);}break;}
-      // 뒤 방향 빈칸
-      for(let d=1;d<BS;d++){const rr=r-dr*d,cc=c-dc*d;if(rr<0||rr>=BS||cc<0||cc>=BS)break;if(b[rr][cc]===p)continue;if(b[rr][cc]===0){blocks.add(rr*BS+cc);}break;}
+      const line=[],pos=[];
+      for(let d=-4;d<=4;d++){
+        const rr=r+dr*d,cc=c+dc*d;
+        if(rr<0||rr>=BS||cc<0||cc>=BS){line.push(-1);pos.push(null);}
+        else{line.push(b[rr][cc]);pos.push([rr,cc]);}
+      }
+      // 5칸 윈도우에서 내 돌 4개 + 빈칸 1개 → 그 빈칸이 블로킹 포인트
+      for(let s=0;s<=4;s++){
+        let mine=0,emptyI=-1,bad=false;
+        for(let i=s;i<s+5;i++){
+          if(line[i]===p)mine++;
+          else if(line[i]===0){if(emptyI===-1)emptyI=i;else{bad=true;break;}}
+          else{bad=true;break;}
+        }
+        if(bad||mine!==4||emptyI===-1)continue;
+        const bp=pos[emptyI];
+        if(bp)blocks.add(bp[0]*BS+bp[1]);
+      }
     }
   }
   return[...blocks].map(v=>[Math.floor(v/BS),v%BS]);
@@ -689,12 +729,38 @@ function checkWin(b,r,c,p){
   }
   return false;
 }
+function scanBestMain(b,r,c,dr,dc,p){
+  const line=[];
+  for(let d=-4;d<=4;d++){
+    const rr=r+dr*d,cc=c+dc*d;
+    if(rr<0||rr>=BS||cc<0||cc>=BS)line.push(-1);
+    else line.push(b[rr][cc]);
+  }
+  let bestN=0,bestO=0;
+  for(let s=0;s<=4;s++){
+    let mine=0,empty=0,bad=false;
+    for(let i=s;i<s+5;i++){
+      if(line[i]===p)mine++;
+      else if(line[i]===0)empty++;
+      else{bad=true;break;}
+    }
+    if(bad||mine+empty<5)continue;
+    const lo=s>0&&line[s-1]===0?1:0;
+    const ro=s+5<9&&line[s+5]===0?1:0;
+    if(mine>bestN||(mine===bestN&&lo+ro>bestO)){bestN=mine;bestO=lo+ro;}
+  }
+  return{n:bestN,o:bestO};
+}
 function isForbidden(b,r,c){
   const t=b.map(x=>[...x]);t[r][c]=1;
   for(const[dr,dc]of DIRS){const{n}=countLine(t,r,c,dr,dc,1);if(n>=6)return'장목';}
   if(checkWin(t,r,c,1))return null;
   let f=0,th=0;
-  for(const[dr,dc]of DIRS){const{n,o}=countLine(t,r,c,dr,dc,1);if(n===4&&o>=1)f++;if(n===3&&o===2)th++;}
+  for(const[dr,dc]of DIRS){
+    const{n,o}=scanBestMain(t,r,c,dr,dc,1);
+    if(n===4&&o>=1)f++;
+    if(n===3&&o===2)th++;
+  }
   if(f>=2)return'4-4';if(th>=2)return'3-3';return null;
 }
 function getWinStones(b,r,c,p){
