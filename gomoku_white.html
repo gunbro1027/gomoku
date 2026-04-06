@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>오목 - 백 대전</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #000a1a 0%, #001530 40%, #000a1a 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-family: 'Noto Sans KR', sans-serif; padding: 20px; gap: 14px; user-select: none;
+}
+h1 { font-size: 30px; font-weight: 900; letter-spacing: 10px; color: #c8e0f5;
+     text-shadow: 0 0 24px rgba(80,160,255,0.6); font-family: serif; }
+.subtitle { font-size: 11px; letter-spacing: 2px; color: #4080a0; margin-top: 3px; }
+#status {
+  background: rgba(0,0,0,0.5); border: 1px solid rgba(80,160,255,0.3);
+  border-radius: 30px; padding: 9px 28px; font-size: 13px; color: #c8e0f5;
+  min-width: 300px; text-align: center; transition: all 0.3s; letter-spacing: 1px;
+}
+#status.forbidden { color: #ff7070; border-color: rgba(255,80,80,0.6); }
+#status.win       { color: #ffd700; }
+#status.thinking  { color: #a0c4ff; }
+.board-wrap {
+  background: linear-gradient(145deg, #c8872a, #a06020, #c8872a);
+  border-radius: 10px; padding: 28px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,220,100,0.3);
+}
+.col-labels { display: flex; margin-left: 18px; margin-bottom: 4px; }
+.col-label  { width: 34px; text-align: center; font-size: 9px; color: rgba(80,40,0,0.7); font-weight: 700; }
+.board-row-wrap { display: flex; }
+.row-labels { display: flex; flex-direction: column; }
+.row-label  { height: 34px; width: 18px; display: flex; align-items: center; justify-content: center;
+              font-size: 9px; color: rgba(80,40,0,0.7); font-weight: 700; }
+#board-svg-wrap { position: relative; }
+#board-svg { position: absolute; top: 0; left: 0; pointer-events: none; }
+#board-grid { display: grid; grid-template-columns: repeat(15, 34px);
+              grid-template-rows: repeat(15, 34px); position: relative; z-index: 1; }
+.cell { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+        cursor: pointer; position: relative; }
+.stone { width: 28px; height: 28px; border-radius: 50%;
+         box-shadow: 0 2px 7px rgba(0,0,0,0.55); animation: popIn 0.15s ease-out; }
+.stone.black      { background: radial-gradient(circle at 35% 35%, #888, #111); }
+.stone.white      { background: radial-gradient(circle at 35% 35%, #fff, #c0c0c0); }
+.stone.last-black { border: 2.5px solid #f84; }
+.stone.last-white { border: 2.5px solid #4af; }
+.stone.win-black  { box-shadow: 0 0 16px 6px #f84, 0 2px 4px rgba(0,0,0,0.5); }
+.stone.win-white  { box-shadow: 0 0 16px 6px #4af, 0 2px 4px rgba(0,0,0,0.5); }
+.forbidden-mark {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: rgba(255,50,50,0.18); border: 1.5px solid rgba(255,60,60,0.45);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; color: rgba(255,80,80,0.75); pointer-events: none; position: absolute;
+}
+.controls { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; justify-content: center; }
+#new-game {
+  background: linear-gradient(135deg, #1a5080, #0a2840); color: #c8e0f5;
+  border: none; border-radius: 20px; padding: 11px 30px;
+  font-size: 13px; font-weight: 700; cursor: pointer; letter-spacing: 2px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.4); transition: transform 0.1s; font-family: inherit;
+}
+#new-game:active { transform: scale(0.96); }
+.info   { font-size: 11px; color: #2a6080; }
+.legend { display: flex; gap: 18px; font-size: 11px; color: #2a6080; flex-wrap: wrap; justify-content: center; }
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.legend-dot  { width: 14px; height: 14px; border-radius: 50%; }
+@keyframes popIn { 0%{transform:scale(0.4);opacity:0.4} 100%{transform:scale(1);opacity:1} }
+</style>
+</head>
+<body>
+<div style="text-align:center">
+  <h1>오 목</h1>
+  <div class="subtitle">AI 흑 선공 · 당신은 백 · 깊이8 · 반복심화 · 트랜스포지션 테이블 · Web Worker</div>
+</div>
+<div id="status">⚫ AI가 첫 수를 두는 중...</div>
+<div class="board-wrap">
+  <div class="col-labels" id="col-labels"></div>
+  <div class="board-row-wrap">
+    <div class="row-labels" id="row-labels"></div>
+    <div id="board-svg-wrap">
+      <svg id="board-svg"></svg>
+      <div id="board-grid"></div>
+    </div>
+  </div>
+</div>
+<div class="controls">
+  <button id="new-game">새 게임</button>
+  <div class="info" id="move-count">0수</div>
+  <div class="info" id="think-time"></div>
+</div>
+<div class="legend">
+  <div class="legend-item">
+    <div class="legend-dot" style="background:radial-gradient(circle at 35% 35%,#888,#111)"></div> AI (흑, 선공)
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background:radial-gradient(circle at 35% 35%,#fff,#c0c0c0);border:1px solid #ccc"></div> 나 (백)
+  </div>
+</div>
+<script>
+const AI_CODE = `
+'use strict';
+const BS=15;
+const DIRS=[[0,1],[1,0],[1,1],[1,-1]];
+// 1=흑(AI)  2=백(플레이어)  0=빈칸
+
+function countLine(b,r,c,dr,dc,p){
+  let n=1,oA=0,oB=0;
+  for(let d=1;d<BS;d++){const rr=r+dr*d,cc=c+dc*d;if(rr<0||rr>=BS||cc<0||cc>=BS)break;if(b[rr][cc]===p)n++;else{if(!b[rr][cc])oA=1;break;}}
+  for(let d=1;d<BS;d++){const rr=r-dr*d,cc=c-dc*d;if(rr<0||rr>=BS||cc<0||cc>=BS)break;if(b[rr][cc]===p)n++;else{if(!b[rr][cc])oB=1;break;}}
+  return{n,o:oA+oB};
+}
+function checkWin(b,r,c,p){
+  for(const [dr,dc] of DIRS){const{n}=countLine(b,r,c,dr,dc,p);if(p===1&&n>=5)return true;if(p===2&&n===5)return true;}
+  return false;
+}
+
+// 백(플레이어)에게 금수 적용
+function isForbiddenWhite(b,r,c){
+  const t=b.map(x=>[...x]);t[r][c]=2;
+  for(const [dr,dc] of DIRS){const{n}=countLine(t,r,c,dr,dc,2);if(n>=6)return true;}
+  if(checkWin(t,r,c,2))return false;
+  let f=0,th=0;
+  for(const [dr,dc] of DIRS){const{n,o}=countLine(t,r,c,dr,dc,2);if(n===4&&o>=1)f++;if(n===3&&o===2)th++;}
+  return f>=2||th>=2;
+}
+
+function getThreats(b,r,c,p){
+  let five=0,open4=0,four=0,open3=0,three=0,two=0;
+  for(const [dr,dc] of DIRS){
+    const{n,o}=countLine(b,r,c,dr,dc,p);
+    if(n>=5)five++;
+    else if(n===4&&o===2)open4++;
+    else if(n===4&&o===1)four++;
+    else if(n===3&&o===2)open3++;
+    else if(n===3&&o===1)three++;
+    else if(n===2&&o===2)two++;
+  }
+  return{five,open4,four,open3,three,two};
+}
+function scoreThreats(t){
+  let s=0;
+  if(t.five)return 10000000;
+  if(t.open4>=2)             s+=6000000;
+  if(t.open4>=1&&t.four>=1)  s+=4500000;
+  if(t.open4>=1&&t.open3>=1) s+=3000000;
+  if(t.four>=2)              s+=2000000;
+  if(t.four>=1&&t.open3>=1)  s+=1200000;
+  if(t.open3>=2)             s+=400000;
+  if(t.open4===1) s+=700000;
+  if(t.four===1)  s+=130000;
+  if(t.open3===1) s+=28000;
+  if(t.three>=1)  s+=4000;
+  if(t.two>=1)    s+=500;
+  return s;
+}
+
+// 전체 보드 평가 (흑=AI 기준 양수)
+function evalBoard(b){
+  let score=0;
+  for(let r=0;r<BS;r++)
+    for(let c=0;c<BS;c++){
+      const p=b[r][c];if(!p)continue;
+      const t=getThreats(b,r,c,p);
+      const s=scoreThreats(t);
+      const center=Math.max(0,7-Math.abs(r-7)-Math.abs(c-7));
+      score+=(p===1?1:-1)*(s+center*3);
+    }
+  return score;
+}
+
+function getCandidates(b){
+  let has=false;const set=new Set();
+  for(let r=0;r<BS;r++)for(let c=0;c<BS;c++){
+    if(!b[r][c])continue;has=true;
+    for(let dr=-2;dr<=2;dr++)for(let dc=-2;dc<=2;dc++){
+      const nr=r+dr,nc=c+dc;
+      if(nr>=0&&nr<BS&&nc>=0&&nc<BS&&!b[nr][nc])set.add(nr*BS+nc);
+    }
+  }
+  if(!has)return[[7,7]];
+  return[...set].map(v=>[Math.floor(v/BS),v%BS]);
+}
+function moveScore(b,r,c,isMax){
+  const me=isMax?1:2,op=isMax?2:1;
+  const tb=b.map(x=>[...x]);
+  tb[r][c]=me;const tMe=getThreats(tb,r,c,me);
+  tb[r][c]=op;const tOp=getThreats(tb,r,c,op);
+  tb[r][c]=0;
+  return scoreThreats(tMe)*2+scoreThreats(tOp);
+}
+
+const killers=Array.from({length:12},()=>[]);
+
+// ── 조브리스트 해싱 + 트랜스포지션 테이블 ──────────────────
+const ZOBRIST=(()=>{
+  const t=[];
+  for(let r=0;r<BS;r++){t[r]=[];for(let c=0;c<BS;c++){t[r][c]=[];for(let p=0;p<3;p++)t[r][c][p]=Math.floor(Math.random()*0xFFFFFFFF)+1;}}
+  return t;
+})();
+const TT_SIZE=1<<20;
+const tt=new Int32Array(TT_SIZE*4);
+const TT_EXACT=0,TT_LOWER=1,TT_UPPER=2;
+
+function boardHash(b){
+  let h=0;
+  for(let r=0;r<BS;r++)for(let c=0;c<BS;c++)if(b[r][c])h^=ZOBRIST[r][c][b[r][c]];
+  return h>>>0;
+}
+function ttLookup(hash,depth,alpha,beta){
+  const idx=(hash%TT_SIZE)*4;
+  if(tt[idx]!==hash) return null;
+  if(tt[idx+1]<depth) return null;
+  const score=tt[idx+2],flag=tt[idx+3];
+  if(flag===TT_EXACT) return score;
+  if(flag===TT_LOWER&&score>=beta) return score;
+  if(flag===TT_UPPER&&score<=alpha) return score;
+  return null;
+}
+function ttStore(hash,depth,score,flag){
+  const idx=(hash%TT_SIZE)*4;
+  if(tt[idx+1]>depth) return;
+  tt[idx]=hash;tt[idx+1]=depth;tt[idx+2]=score;tt[idx+3]=flag;
+}
+
+function minimax(b,depth,alpha,beta,isMax,lr,lc,lp,hash){
+  if(lr!==-1&&checkWin(b,lr,lc,lp))
+    return isMax?-(10000000+depth*2000):(10000000+depth*2000);
+  if(depth===0)return evalBoard(b);
+  const cands=getCandidates(b);
+  if(!cands.length)return evalBoard(b);
+  const h=(hash===undefined)?boardHash(b):hash;
+  const cached=ttLookup(h,depth,alpha,beta);
+  if(cached!==null) return cached;
+  const limit=depth>=6?8:depth>=4?12:16;
+  const scored=cands.map(([r,c])=>({r,c,s:moveScore(b,r,c,isMax)}));
+  scored.sort((a,x)=>x.s-a.s);
+  const kl=killers[depth]||[];
+  const moves=[];
+  for(const[kr,kc]of kl){const i=scored.findIndex(x=>x.r===kr&&x.c===kc);if(i>=0)moves.push(scored.splice(i,1)[0]);}
+  moves.push(...scored);
+  const fin=moves.slice(0,limit);
+  let best=isMax?-Infinity:Infinity;
+  let bestFlag=TT_UPPER;
+  if(isMax){
+    for(const{r,c}of fin){
+      const nh=h^ZOBRIST[r][c][1];
+      b[r][c]=1;const v=minimax(b,depth-1,alpha,beta,false,r,c,1,nh);b[r][c]=0;
+      if(v>best)best=v;
+      if(v>alpha){alpha=v;bestFlag=TT_EXACT;killers[depth]=[[r,c],...(killers[depth]||[]).slice(0,2)];}
+      if(beta<=alpha){bestFlag=TT_LOWER;break;}
+    }
+  }else{
+    for(const{r,c}of fin){
+      const nh=h^ZOBRIST[r][c][2];
+      b[r][c]=2;const v=minimax(b,depth-1,alpha,beta,true,r,c,2,nh);b[r][c]=0;
+      if(v<best)best=v;
+      if(v<beta){beta=v;bestFlag=TT_EXACT;killers[depth]=[[r,c],...(killers[depth]||[]).slice(0,2)];}
+      if(beta<=alpha){bestFlag=TT_LOWER;break;}
+    }
+    if(best===Infinity)best=evalBoard(b);
+  }
+  ttStore(h,depth,best,bestFlag);
+  return best;
+}
+
+function getAIMove(b,depth){
+  const cands=getCandidates(b);
+  if(cands.length===1)return cands[0];
+  // 즉각 승리
+  for(const[r,c]of cands){const t=b.map(x=>[...x]);t[r][c]=1;if(checkWin(t,r,c,1))return[r,c];}
+  // 즉각 방어
+  for(const[r,c]of cands){const t=b.map(x=>[...x]);t[r][c]=2;if(checkWin(t,r,c,2))return[r,c];}
+  // 내(흑) 4-3 이상
+  for(const[r,c]of cands){
+    const t=b.map(x=>[...x]);t[r][c]=1;const th=getThreats(t,r,c,1);
+    if(th.open4>=1)return[r,c];
+    if(th.open4>=1&&th.open3>=1)return[r,c];
+    if(th.four>=2)return[r,c];
+  }
+  // 상대(백) 4-3 방어
+  for(const[r,c]of cands){
+    const t=b.map(x=>[...x]);t[r][c]=2;const th=getThreats(t,r,c,2);
+    if(th.open4>=1)return[r,c];
+    if(th.open4>=1&&th.open3>=1)return[r,c];
+    if(th.four>=1&&th.open3>=1)return[r,c];
+    if(th.four>=2)return[r,c];
+  }
+  tt.fill(0);killers.fill([]);
+  const rootHash=boardHash(b);
+  const scored=cands.map(([r,c])=>({r,c,s:moveScore(b,r,c,true)}));
+  scored.sort((a,x)=>x.s-a.s);
+  let moves=scored.slice(0,20);
+  let bestMove=[moves[0].r,moves[0].c];
+
+  // 반복 심화: 깊이 2부터 목표 깊이까지
+  for(let d=2;d<=depth;d++){
+    let best=-Infinity;
+    const results=[];
+    for(const{r,c}of moves){
+      const nh=rootHash^ZOBRIST[r][c][1];
+      b[r][c]=1;
+      const s=minimax(b,d-1,-Infinity,Infinity,false,r,c,1,nh);
+      b[r][c]=0;
+      results.push({r,c,s});
+      if(s>best){best=s;bestMove=[r,c];}
+    }
+    results.sort((a,x)=>x.s-a.s);
+    const nextLimit=d>=6?12:16;
+    moves=results.slice(0,nextLimit);
+  }
+  return bestMove;
+}
+
+self.onmessage=function(e){
+  const{board,depth}=e.data;
+  self.postMessage(getAIMove(board,depth));
+};
+`;
+
+const BS=15,DIRS=[[0,1],[1,0],[1,1],[1,-1]];
+let board=Array(BS).fill(null).map(()=>Array(BS).fill(0));
+// isPlayerTurn: true = 백(플레이어) 차례, false = 흑(AI) 차례
+let isPlayerTurn=false,winner=null,lastMove=null,moveCount=0,winnerStones=[],thinkStart=0;
+const DEPTH=8;
+let worker=null;
+
+function createWorker(){
+  if(worker)worker.terminate();
+  const blob=new Blob([AI_CODE],{type:'application/javascript'});
+  worker=new Worker(URL.createObjectURL(blob));
+  worker.onmessage=function(e){
+    const[ar,ac]=e.data;
+    document.getElementById('think-time').textContent='AI: '+((Date.now()-thinkStart)/1000).toFixed(1)+'초';
+    board[ar][ac]=1;lastMove=[ar,ac];moveCount++;
+    const ws=getWinStones(board,ar,ac,1);
+    if(ws){winner='B';winnerStones=ws;}
+    else isPlayerTurn=true;
+    render();setStatus();
+  };
+}
+createWorker();
+
+function countLine(b,r,c,dr,dc,p){
+  let n=1,oA=0,oB=0;
+  for(let d=1;d<BS;d++){const rr=r+dr*d,cc=c+dc*d;if(rr<0||rr>=BS||cc<0||cc>=BS)break;if(b[rr][cc]===p)n++;else{if(!b[rr][cc])oA=1;break;}}
+  for(let d=1;d<BS;d++){const rr=r-dr*d,cc=c-dc*d;if(rr<0||rr>=BS||cc<0||cc>=BS)break;if(b[rr][cc]===p)n++;else{if(!b[rr][cc])oB=1;break;}}
+  return{n,o:oA+oB};
+}
+function checkWin(b,r,c,p){
+  for(const[dr,dc]of DIRS){const{n}=countLine(b,r,c,dr,dc,p);if(p===1&&n>=5)return true;if(p===2&&n===5)return true;}
+  return false;
+}
+function isForbiddenWhite(b,r,c){
+  const t=b.map(x=>[...x]);t[r][c]=2;
+  for(const[dr,dc]of DIRS){const{n}=countLine(t,r,c,dr,dc,2);if(n>=6)return'장목';}
+  if(checkWin(t,r,c,2))return null;
+  let f=0,th=0;
+  for(const[dr,dc]of DIRS){const{n,o}=countLine(t,r,c,dr,dc,2);if(n===4&&o>=1)f++;if(n===3&&o===2)th++;}
+  if(f>=2)return'4-4';if(th>=2)return'3-3';return null;
+}
+function getWinStones(b,r,c,p){
+  for(const[dr,dc]of DIRS){
+    const st=[[r,c]];
+    for(let d=1;d<5;d++){const rr=r+dr*d,cc=c+dc*d;if(rr<0||rr>=BS||cc<0||cc>=BS||b[rr][cc]!==p)break;st.push([rr,cc]);}
+    for(let d=1;d<5;d++){const rr=r-dr*d,cc=c-dc*d;if(rr<0||rr>=BS||cc<0||cc>=BS||b[rr][cc]!==p)break;st.push([rr,cc]);}
+    if(st.length>=5)return st;
+  }
+  return null;
+}
+function getForbiddenCells(){
+  if(!isPlayerTurn||winner)return new Set();
+  const s=new Set();
+  for(let r=0;r<BS;r++)for(let c=0;c<BS;c++)if(!board[r][c]&&isForbiddenWhite(board,r,c))s.add(r+','+c);
+  return s;
+}
+function render(){
+  const grid=document.getElementById('board-grid'),fbd=getForbiddenCells();
+  const cells=grid.querySelectorAll('.cell');
+  for(let r=0;r<BS;r++)for(let c=0;c<BS;c++){
+    const cell=cells[r*BS+c],v=board[r][c];
+    const isLast=lastMove&&lastMove[0]===r&&lastMove[1]===c;
+    const isWin=winnerStones.some(([wr,wc])=>wr===r&&wc===c);
+    cell.innerHTML='';
+    if(v){
+      const s=document.createElement('div');s.className='stone '+(v===1?'black':'white');
+      if(isLast)s.classList.add(v===1?'last-black':'last-white');
+      if(isWin)s.classList.add(v===1?'win-black':'win-white');
+      cell.appendChild(s);
+    }else if(fbd.has(r+','+c)&&!winner){
+      const m=document.createElement('div');m.className='forbidden-mark';m.textContent='✕';cell.appendChild(m);
+    }
+  }
+  document.getElementById('move-count').textContent=moveCount+'수';
+}
+function setStatus(msg,cls){
+  const el=document.getElementById('status');el.className=cls||'';
+  if(msg){el.textContent=msg;return;}
+  if(winner==='B'){el.textContent='🤖 AI(흑)가 이겼습니다!';el.className='win';}
+  else if(winner==='W'){el.textContent='🏆 당신(백)이 이겼습니다!';el.className='win';}
+  else if(!isPlayerTurn){el.textContent='🔬 AI(흑) 계산 중...';el.className='thinking';}
+  else{el.textContent='⚪ 당신의 차례 (백)';}
+}
+function initBoard(){
+  const svg=document.getElementById('board-svg'),size=BS*34;
+  svg.setAttribute('width',size);svg.setAttribute('height',size);
+  let sh='';
+  for(let i=0;i<BS;i++){
+    sh+=`<line x1="${17+i*34}" y1="17" x2="${17+i*34}" y2="${17+(BS-1)*34}" stroke="rgba(80,40,0,0.5)" stroke-width="1"/>`;
+    sh+=`<line x1="17" y1="${17+i*34}" x2="${17+(BS-1)*34}" y2="${17+i*34}" stroke="rgba(80,40,0,0.5)" stroke-width="1"/>`;
+  }
+  [[3,3],[3,11],[7,7],[11,3],[11,11]].forEach(([r,c])=>sh+=`<circle cx="${17+c*34}" cy="${17+r*34}" r="3.5" fill="rgba(80,40,0,0.6)"/>`);
+  svg.innerHTML=sh;
+  const colStr='ABCDEFGHJKLMNOP',cl=document.getElementById('col-labels');cl.innerHTML='';
+  for(let i=0;i<BS;i++){const d=document.createElement('div');d.className='col-label';d.textContent=colStr[i];cl.appendChild(d);}
+  const rl=document.getElementById('row-labels');rl.innerHTML='';
+  for(let i=0;i<BS;i++){const d=document.createElement('div');d.className='row-label';d.textContent=BS-i;rl.appendChild(d);}
+  const grid=document.getElementById('board-grid');grid.innerHTML='';
+  for(let r=0;r<BS;r++)for(let c=0;c<BS;c++){
+    const cell=document.createElement('div');cell.className='cell';
+    cell.addEventListener('click',()=>handleClick(r,c));grid.appendChild(cell);
+  }
+}
+function handleClick(r,c){
+  if(!isPlayerTurn||board[r][c]||winner)return;
+  const fb=isForbiddenWhite(board,r,c);
+  if(fb){setStatus('🚫 금수! ('+fb+')','forbidden');setTimeout(()=>setStatus(),1500);return;}
+  board[r][c]=2;lastMove=[r,c];moveCount++;
+  const ws=getWinStones(board,r,c,2);
+  if(ws){winner='W';winnerStones=ws;render();setStatus();return;}
+  isPlayerTurn=false;render();setStatus();
+  thinkStart=Date.now();
+  worker.postMessage({board:board.map(x=>[...x]),depth:DEPTH});
+}
+function aiFirstMove(){
+  // AI 첫 수: 가운데(H8) = [7,7]
+  board[7][7]=1;lastMove=[7,7];moveCount=1;
+  isPlayerTurn=true;
+  render();setStatus();
+}
+function resetGame(){
+  board=Array(BS).fill(null).map(()=>Array(BS).fill(0));
+  isPlayerTurn=false;winner=null;lastMove=null;moveCount=0;winnerStones=[];
+  document.getElementById('think-time').textContent='';
+  createWorker();render();
+  setStatus('⚫ AI가 첫 수를 두는 중...');
+  setTimeout(aiFirstMove, 300);
+}
+document.getElementById('new-game').addEventListener('click',resetGame);
+initBoard();render();
+setStatus('⚫ AI가 첫 수를 두는 중...');
+setTimeout(aiFirstMove, 300);
+</script>
+</body>
+</html>

@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>오목 PRO</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  min-height:100vh;
+  background:radial-gradient(ellipse at 50% 30%,#1a1428 0%,#0a0810 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:'Noto Sans KR',sans-serif;padding:20px;gap:14px;user-select:none;
+}
+.pro-title{
+  font-size:32px;font-weight:900;letter-spacing:10px;font-family:serif;
+  background:linear-gradient(135deg,#c8a060 0%,#f0d090 50%,#c8a060 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 0 20px rgba(200,160,80,0.5));
+}
+.pro-sub{font-size:10px;letter-spacing:3px;color:#5040a0;margin-top:3px;}
+/* ── 모드 선택 ── */
+#mode-screen{display:flex;flex-direction:column;align-items:center;gap:28px;}
+.mode-desc{font-size:12px;color:#7060c0;text-align:center;line-height:1.9;letter-spacing:1px;}
+.mode-desc b{color:#a090e0;}
+.mode-buttons{display:flex;gap:22px;}
+.mbtn{
+  width:152px;height:152px;border-radius:14px;border:2px solid;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;cursor:pointer;transition:all .18s;background:none;font-family:inherit;
+}
+.mbtn-b{border-color:rgba(200,180,120,.35);background:linear-gradient(145deg,#1e1e1e,#0e0e0e);color:#f0e0c0;}
+.mbtn-w{border-color:rgba(160,140,80,.35);background:linear-gradient(145deg,#e8e8e8,#c0c0c0);color:#1a1a1a;}
+.mbtn:hover{transform:scale(1.06);box-shadow:0 8px 32px rgba(0,0,0,.6);}
+.mstone{width:48px;height:48px;border-radius:50%;box-shadow:0 4px 12px rgba(0,0,0,.5);}
+.mbtn-b .mstone{background:radial-gradient(circle at 33% 33%,#888,#111);}
+.mbtn-w .mstone{background:radial-gradient(circle at 33% 33%,#fff,#aaa);}
+.mlabel{font-size:15px;font-weight:700;letter-spacing:2px;}
+.msub{font-size:10px;opacity:.65;letter-spacing:1px;}
+.diff-badge{
+  background:linear-gradient(135deg,#7a1820,#b02030);
+  color:#fff;border-radius:20px;padding:5px 20px;
+  font-size:11px;font-weight:700;letter-spacing:3px;
+}
+/* ── 게임 화면 ── */
+#game-screen{display:none;flex-direction:column;align-items:center;gap:13px;}
+#status{
+  background:rgba(0,0,0,.55);border:1px solid rgba(200,160,80,.22);
+  border-radius:30px;padding:9px 28px;font-size:13px;color:#c8c0a0;
+  min-width:320px;text-align:center;transition:all .3s;letter-spacing:1px;
+}
+#status.forbidden{color:#ff7070;border-color:rgba(255,80,80,.5);}
+#status.win{color:#ffd700;border-color:rgba(255,215,0,.4);}
+#status.thinking{color:#80a8ff;border-color:rgba(80,120,255,.3);}
+#vcf-badge{
+  display:none;background:rgba(180,40,40,.18);border:1px solid rgba(220,60,60,.4);
+  border-radius:20px;padding:4px 18px;font-size:11px;color:#f07070;letter-spacing:2px;
+}
+.board-wrap{
+  background:linear-gradient(145deg,#c8872a,#a06020,#c8872a);
+  border-radius:10px;padding:28px;
+  box-shadow:0 12px 50px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,220,100,.3);
+}
+.col-labels{display:flex;margin-left:18px;margin-bottom:4px;}
+.col-label{width:34px;text-align:center;font-size:9px;color:rgba(80,40,0,.7);font-weight:700;}
+.board-row-wrap{display:flex;}
+.row-labels{display:flex;flex-direction:column;}
+.row-label{height:34px;width:18px;display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(80,40,0,.7);font-weight:700;}
+#board-svg-wrap{position:relative;}
+#board-svg{position:absolute;top:0;left:0;pointer-events:none;}
+#board-grid{display:grid;grid-template-columns:repeat(15,34px);grid-template-rows:repeat(15,34px);position:relative;z-index:1;}
+.cell{width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;}
+.cell:hover::after{content:'';position:absolute;width:26px;height:26px;border-radius:50%;background:rgba(255,255,200,.1);pointer-events:none;}
+.stone{width:28px;height:28px;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.6);animation:popIn .12s ease-out;}
+.stone.black{background:radial-gradient(circle at 33% 33%,#999,#111);}
+.stone.white{background:radial-gradient(circle at 33% 33%,#fff,#b0b0b0);}
+.stone.last-black{border:2.5px solid #4af;}
+.stone.last-white{border:2.5px solid #f84;}
+.stone.win-black{box-shadow:0 0 20px 8px #4af,0 2px 4px rgba(0,0,0,.5);}
+.stone.win-white{box-shadow:0 0 20px 8px #ff4,0 2px 4px rgba(0,0,0,.5);}
+.fmark{width:18px;height:18px;border-radius:50%;background:rgba(255,50,50,.14);border:1.5px solid rgba(255,60,60,.38);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,80,80,.7);pointer-events:none;position:absolute;}
+.controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center;}
+.btn{border:none;border-radius:20px;padding:10px 22px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:2px;box-shadow:0 4px 14px rgba(0,0,0,.4);transition:all .1s;font-family:inherit;}
+.btn:active{transform:scale(0.95);}
+#btn-new{background:linear-gradient(135deg,#c8872a,#8b5010);color:#fff8e8;}
+#btn-mode{background:linear-gradient(135deg,#282850,#181830);color:#9090d0;}
+.info{font-size:11px;color:#454580;}
+.legend{display:flex;gap:16px;font-size:11px;color:#454580;flex-wrap:wrap;justify-content:center;}
+.legend-item{display:flex;align-items:center;gap:6px;}
+.ldot{width:14px;height:14px;border-radius:50%;}
+@keyframes popIn{0%{transform:scale(.3);opacity:.3}100%{transform:scale(1);opacity:1}}
+@keyframes pulse{0%,100%{opacity:.7}50%{opacity:1}}
+.pulsing{animation:pulse 1.2s infinite;}
+</style>
+</head>
+<body>
+
+<!-- ── 모드 선택 ── -->
+<div id="mode-screen">
+  <div style="text-align:center">
+    <div class="pro-title">오 목</div>
+    <div class="pro-sub">GOMOKU PRO EDITION</div>
+  </div>
+  <div class="diff-badge">★ EXPERT ★</div>
+  <div class="mode-desc">
+    <b>VCF/VCT 강제승 탐색</b> · <b>깊이 10</b> 반복심화<br>
+    Null Move Pruning · 위협 연장 · Aspiration Window<br>
+    히스토리/킬러 휴리스틱 · 2M 트랜스포지션 테이블<br><br>
+    어느 색으로 플레이하시겠습니까?
+  </div>
+  <div class="mode-buttons">
+    <button class="mbtn mbtn-b" onclick="startGame(1)">
+      <div class="mstone"></div>
+      <div class="mlabel">흑 (선공)</div>
+      <div class="msub">금수 적용</div>
+    </button>
+    <button class="mbtn mbtn-w" onclick="startGame(2)">
+      <div class="mstone"></div>
+      <div class="mlabel">백 (후공)</div>
+      <div class="msub">장목 승리</div>
+    </button>
+  </div>
+</div>
+
+<!-- ── 게임 화면 ── -->
+<div id="game-screen">
+  <div style="text-align:center">
+    <div class="pro-title" style="font-size:24px;letter-spacing:6px">오 목</div>
+    <div class="pro-sub" id="gsub"></div>
+  </div>
+  <div id="status">대기 중...</div>
+  <div id="vcf-badge">⚡ VCF/VCT 강제승 수순 발견</div>
+  <div class="board-wrap">
+    <div class="col-labels" id="col-labels"></div>
+    <div class="board-row-wrap">
+      <div class="row-labels" id="row-labels"></div>
+      <div id="board-svg-wrap">
+        <svg id="board-svg"></svg>
+        <div id="board-grid"></div>
+      </div>
+    </div>
+  </div>
+  <div class="controls">
+    <button class="btn" id="btn-new">새 게임</button>
+    <button class="btn" id="btn-mode">색 선택</button>
+    <div class="info" id="move-count">0수</div>
+    <div class="info" id="think-time"></div>
+  </div>
+  <div class="legend" id="legend"></div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+// WEB WORKER AI CODE
+// ══════════════════════════════════════════════════
+const AI_CODE = `
+'use strict';
+const BS=15;
+const DIRS=[[0,1],[1,0],[1,1],[1,-1]];
+
+function countLine(b,r,c,dr,dc,p){
+  let n=1,oA=0,oB=0;
+  for(let d=1;d<BS;d++){const rr=r+dr*d,cc=c+dc*d;if(rr<0||rr>=BS||cc<0||cc>=BS)break;if(b[rr][cc]===p)n++;else{if(b[rr][cc]===0)oA=1;break;}}
+  for(let d=1;d<BS;d++){const rr=r-dr*d,cc=c-dc*d;if(rr<0||rr>=BS||cc<0||cc>=BS)break;if(b[rr][cc]===p)n++;else{if(b[rr][cc]===0)oB=1;break;}}
+  return{n,o:oA+oB};
+}
+
+// 엄격 승리판정: 흑=정확히5, 백=5이상
+function checkWin(b,r,c,p){
+  for(const[dr,dc]of DIRS){
+    const{n}=countLine(b,r,c,dr,dc,p);
+    if(p===1&&n===5)return true;
+    if(p===2&&n>=5)return true;
+  }
+  return false;
+}
+
+function isForbidden(b,r,c){
+  const t=b.map(x=>[...x]);t[r][c]=1;
+  for(const[dr,dc]of DIRS){const{n}=countLine(t,r,c,dr,dc,1);if(n>=6)return true;}
+  if(checkWin(t,r,c,1))return false;
+  let f=0,th=0;
+  for(const[dr,dc]of DIRS){const{n,o}=countLine(t,r,c,dr,dc,1);if(n===4&&o>=1)f++;if(n===3&&o===2)th++;}
+  return f>=2||th>=2;
+}
+
+function getThreats(b,r,c,p){
+  let five=0,open4=0,four=0,open3=0,three=0,two=0;
+  for(const[dr,dc]of DIRS){
+    const{n,o}=countLine(b,r,c,dr,dc,p);
+    if(n>=5)five++;
+    else if(n===4&&o===2)open4++;
+    else if(n===4&&o===1)four++;
+    else if(n===3&&o===2)open3++;
+    else if(n===3&&o===1)three++;
+    else if(n===2&&o===2)two++;
+  }
+  return{five,open4,four,open3,three,two};
+}
+
+function scoreThreats(t){
+  if(t.five)return 10000000;
+  let s=0;
+  if(t.open4>=2)            s+=6000000;
+  if(t.open4>=1&&t.four>=1) s+=4500000;
+  if(t.open4>=1&&t.open3>=1)s+=3000000;
+  if(t.four>=2)             s+=2000000;
+  if(t.four>=1&&t.open3>=1) s+=1200000;
+  if(t.open3>=2)            s+=500000;
+  if(t.open4===1)s+=700000;
+  if(t.four===1) s+=150000;
+  if(t.open3===1)s+=32000;
+  if(t.three>=1) s+=5000;
+  if(t.two>=1)   s+=600;
+  return s;
+}
+
+// 슬라이딩 윈도우 패턴 점수 (깨진 패턴 포함)
+function scoreWindow(b,r,c,dr,dc,p){
+  const op=p===1?2:1;
+  let score=0;
+  // 9칸 추출
+  const line=[];
+  for(let d=-4;d<=4;d++){
+    const rr=r+dr*d,cc=c+dc*d;
+    if(rr<0||rr>=BS||cc<0||cc>=BS)line.push(-1);
+    else line.push(b[rr][cc]);
+  }
+  for(let i=0;i<=4;i++){
+    let mine=0,empty=0,hasOp=false;
+    for(let j=i;j<i+5;j++){
+      if(line[j]===p)mine++;
+      else if(line[j]===0)empty++;
+      else{hasOp=true;break;}
+    }
+    if(hasOp)continue;
+    if(mine+empty!==5)continue;
+    const lo=i>0&&line[i-1]===0?1:0;
+    const ro=i+5<9&&line[i+5]===0?1:0;
+    if(mine===5)score+=10000000;
+    else if(mine===4&&empty===1){score+=lo+ro===2?200000:70000;}
+    else if(mine===3&&empty===2){score+=lo+ro===2?18000:4000;}
+    else if(mine===2&&empty===3&&lo+ro===2){score+=300;}
+  }
+  return score;
+}
+
+function evalBoard(b,aiP){
+  const human=aiP===1?2:1;
+  let score=0;
+  for(let r=0;r<BS;r++)for(let c=0;c<BS;c++){
+    const p=b[r][c];if(!p)continue;
+    const t=getThreats(b,r,c,p);
+    let s=scoreThreats(t);
+    for(const[dr,dc]of DIRS)s+=scoreWindow(b,r,c,dr,dc,p)*0.25;
+    const center=Math.max(0,7-Math.abs(r-7)-Math.abs(c-7));
+    score+=(p===aiP?1:-1)*(s+center*5);
+  }
+  return score;
+}
+
+function getCandidates(b){
+  let has=false;const set=new Set();
+  for(let r=0;r<BS;r++)for(let c=0;c<BS;c++){
+    if(!b[r][c])continue;has=true;
+    for(let dr=-2;dr<=2;dr++)for(let dc=-2;dc<=2;dc++){
+      const nr=r+dr,nc=c+dc;
+      if(nr>=0&&nr<BS&&nc>=0&&nc<BS&&!b[nr][nc])set.add(nr*BS+nc);
+    }
+  }
+  if(!has)return[[7,7]];
+  return[...set].map(v=>[Math.floor(v/BS),v%BS]);
+}
+
+function moveScore(b,r,c,isMax,aiP){
+  const me=isMax?aiP:(aiP===1?2:1);
+  const op=isMax?(aiP===1?2:1):aiP;
+  const tb=b.map(x=>[...x]);
+  tb[r][c]=me;const tMe=getThreats(tb,r,c,me);
+  tb[r][c]=op;const tOp=getThreats(tb,r,c,op);
+  tb[r][c]=0;
+  return scoreThreats(tMe)*2+scoreThreats(tOp);
+}
+
+// ── VCF: 강제 연속 4 탐색 ──────────────────────────────────
+
+function getFourBlocks(b,p){
+  const blocks=new Set();
+  for(let r=0;r<BS;r++)for(let c=0;c<BS;c++){
+    if(b[r][c]!==p)continue;
+    for(const[dr,dc]of DIRS){
+      const{n,o}=countLine(b,r,c,dr,dc,p);
+      if(n<4||o===0)continue;
+      // 앞 방향 빈칸
+      for(let d=1;d<BS;d++){const rr=r+dr*d,cc=c+dc*d;if(rr<0||rr>=BS||cc<0||cc>=BS)break;if(b[rr][cc]===p)continue;if(b[rr][cc]===0){blocks.add(rr*BS+cc);}break;}
+      // 뒤 방향 빈칸
+      for(let d=1;d<BS;d++){const rr=r-dr*d,cc=c-dc*d;if(rr<0||rr>=BS||cc<0||cc>=BS)break;if(b[rr][cc]===p)continue;if(b[rr][cc]===0){blocks.add(rr*BS+cc);}break;}
+    }
+  }
+  return[...blocks].map(v=>[Math.floor(v/BS),v%BS]);
+}
+
+let vcfDeadline=0;
+
+function vcfSearch(b,atk,depth){
+  if(depth<=0||Date.now()>vcfDeadline)return null;
+  const def=atk===1?2:1;
+  const cands=getCandidates(b);
+
+  // 즉각 승리 수 우선
+  for(const[r,c]of cands){
+    if(atk===1&&isForbidden(b,r,c))continue;
+    b[r][c]=atk;
+    if(checkWin(b,r,c,atk)){b[r][c]=0;return[r,c];}
+    b[r][c]=0;
+  }
+
+  // 4를 만드는 수 탐색
+  const attacks=[];
+  for(const[r,c]of cands){
+    if(atk===1&&isForbidden(b,r,c))continue;
+    b[r][c]=atk;
+    const t=getThreats(b,r,c,atk);
+    if(t.open4||t.four){
+      attacks.push([r,c,t.open4?2:1]);
+    }
+    b[r][c]=0;
+  }
+  // open4 우선 정렬
+  attacks.sort((a,x)=>x[2]-a[2]);
+
+  for(const[r,c]of attacks){
+    b[r][c]=atk;
+    const defMoves=getFourBlocks(b,atk);
+
+    if(defMoves.length===0){b[r][c]=0;return[r,c];}
+
+    let allFail=true;
+    for(const[br,bc]of defMoves){
+      if(def===1&&isForbidden(b,br,bc)){continue;}
+      b[br][bc]=def;
+      if(checkWin(b,br,bc,def)){b[br][bc]=0;allFail=false;break;}
+      const res=vcfSearch(b,atk,depth-1);
+      b[br][bc]=0;
+      if(!res){allFail=false;break;}
+    }
+    b[r][c]=0;
+    if(allFail)return[r,c];
+  }
+  return null;
+}
+
+// ── VCT: 연속 위협 강제승 탐색 (open3 포함, VCF 상위 호환) ──
+
+function getThreeBlocks(b,p){
+  const blocks=new Set();
+  for(let r=0;r<BS;r++)for(let c=0;c<BS;c++){
+    if(b[r][c]!==p)continue;
+    for(const[dr,dc]of DIRS){
+      const{n,o}=countLine(b,r,c,dr,dc,p);
+      if(n!==3||o!==2)continue;
+      for(let d=1;d<BS;d++){const rr=r+dr*d,cc=c+dc*d;if(rr<0||rr>=BS||cc<0||cc>=BS)break;if(b[rr][cc]===p)continue;if(b[rr][cc]===0){blocks.add(rr*BS+cc);}break;}
+      for(let d=1;d<BS;d++){const rr=r-dr*d,cc=c-dc*d;if(rr<0||rr>=BS||cc<0||cc>=BS)break;if(b[rr][cc]===p)continue;if(b[rr][cc]===0){blocks.add(rr*BS+cc);}break;}
+    }
+  }
+  return[...blocks].map(v=>[Math.floor(v/BS),v%BS]);
+}
+
+let vctDeadline=0;
+
+function vctSearch(b,atk,depth){
+  if(depth<=0||Date.now()>vctDeadline)return null;
+  const def=atk===1?2:1;
+  const cands=getCandidates(b);
+
+  // 즉각 승리
+  for(const[r,c]of cands){
+    if(atk===1&&isForbidden(b,r,c))continue;
+    b[r][c]=atk;
+    if(checkWin(b,r,c,atk)){b[r][c]=0;return[r,c];}
+    b[r][c]=0;
+  }
+
+  // 공격 후보: open4 > four > open3
+  const attacks=[];
+  for(const[r,c]of cands){
+    if(atk===1&&isForbidden(b,r,c))continue;
+    b[r][c]=atk;
+    const t=getThreats(b,r,c,atk);
+    if(t.open4||t.four||t.open3)
+      attacks.push([r,c,t.open4?3:t.four?2:1,scoreThreats(t)]);
+    b[r][c]=0;
+  }
+  attacks.sort((a,x)=>x[2]!==a[2]?x[2]-a[2]:x[3]-a[3]);
+
+  for(const[ar,ac,lvl]of attacks.slice(0,10)){
+    b[ar][ac]=atk;
+    const fourBlocks=getFourBlocks(b,atk);
+    let defMoves;
+
+    if(fourBlocks.length>0){
+      // 4가 있으면 반드시 막아야 함
+      defMoves=fourBlocks;
+    }else{
+      // open3 위협: 수비는 3 막기 + 자체 강력 위협 수
+      const cands2=getCandidates(b);
+      const threeBlks=getThreeBlocks(b,atk);
+      const defAtkSet=new Set();
+      for(const[dr,dc]of cands2){
+        if(def===1&&isForbidden(b,dr,dc))continue;
+        b[dr][dc]=def;
+        const dt=getThreats(b,dr,dc,def);
+        if(dt.open4||dt.four||(dt.open3>=2))defAtkSet.add(dr*BS+dc);
+        b[dr][dc]=0;
+      }
+      const combined=new Set([...threeBlks.map(([r2,c2])=>r2*BS+c2),...defAtkSet]);
+      if(combined.size>10){b[ar][ac]=0;continue;} // 수비가 너무 많으면 이 공격 패스
+      defMoves=[...combined].map(v=>[Math.floor(v/BS),v%BS]);
+      if(defMoves.length===0){b[ar][ac]=0;return[ar,ac];}
+    }
+
+    let allFail=true;
+    for(const[br,bc]of defMoves){
+      if(def===1&&isForbidden(b,br,bc))continue;
+      b[br][bc]=def;
+      if(checkWin(b,br,bc,def)){b[br][bc]=0;allFail=false;break;}
+      const res=vctSearch(b,atk,depth-1);
+      b[br][bc]=0;
+      if(!res){allFail=false;break;}
+    }
+    b[ar][ac]=0;
+    if(allFail)return[ar,ac];
+  }
+  return null;
+}
+
+// ── 조브리스트 + 트랜스포지션 ──────────────────────────────
+
+const ZOBRIST=(()=>{
+  const t=[];
+  for(let r=0;r<BS;r++){t[r]=[];for(let c=0;c<BS;c++){t[r][c]=[];for(let p=0;p<3;p++)t[r][c][p]=Math.floor(Math.random()*0xFFFFFFFF)+1;}}
+  return t;
+})();
+const TT_SIZE=1<<21;
+const tt=new Int32Array(TT_SIZE*4);
+const TT_EXACT=0,TT_LOWER=1,TT_UPPER=2;
+
+function boardHash(b){
+  let h=0;
+  for(let r=0;r<BS;r++)for(let c=0;c<BS;c++)if(b[r][c])h^=ZOBRIST[r][c][b[r][c]];
+  return h>>>0;
+}
+function ttLookup(hash,depth,alpha,beta){
+  const idx=(hash%TT_SIZE)*4;
+  if(tt[idx]!==hash)return null;
+  if(tt[idx+1]<depth)return null;
+  const score=tt[idx+2],flag=tt[idx+3];
+  if(flag===TT_EXACT)return score;
+  if(flag===TT_LOWER&&score>=beta)return score;
+  if(flag===TT_UPPER&&score<=alpha)return score;
+  return null;
+}
+function ttStore(hash,depth,score,flag){
+  const idx=(hash%TT_SIZE)*4;
+  if(tt[idx+1]>depth)return;
+  tt[idx]=hash;tt[idx+1]=depth;tt[idx+2]=score;tt[idx+3]=flag;
+}
+
+const killers=Array.from({length:16},()=>[]);
+const hist=new Int32Array(BS*BS*2);
+let searchDeadline=0;
+
+// ── 미니맥스 (깊이10, NMP, 위협연장, 시간제한) ─────────────
+
+function minimax(b,depth,alpha,beta,isMax,lr,lc,lp,hash,aiP,allowNull){
+  if(lr!==-1&&checkWin(b,lr,lc,lp))
+    return isMax?-(10000000+depth*2000):(10000000+depth*2000);
+
+  // 위협 연장: 직전 수가 open4/four/양삼이면 1ply 추가
+  let ext=0;
+  if(depth===1&&lr!==-1){
+    const t=getThreats(b,lr,lc,lp);
+    if(t.open4||t.four||(t.open3>=2))ext=1;
+  }
+
+  if(depth+ext===0)return evalBoard(b,aiP);
+  if(Date.now()>searchDeadline)return evalBoard(b,aiP);
+
+  const cands=getCandidates(b);
+  if(!cands.length)return evalBoard(b,aiP);
+
+  const h=hash!==undefined?hash:boardHash(b);
+  const cached=ttLookup(h,depth,alpha,beta);
+  if(cached!==null)return cached;
+
+  const humanP=aiP===1?2:1;
+
+  // Null Move Pruning: AI가 패스해도 beta 초과 → 가지치기
+  if(allowNull&&isMax&&depth>=3&&lr!==-1){
+    const nms=minimax(b,depth-3,beta-1,beta,false,-1,-1,0,h,aiP,false);
+    if(nms>=beta){ttStore(h,depth,beta,TT_LOWER);return beta;}
+  }
+
+  const limit=depth>=8?6:depth>=6?10:depth>=4?14:20;
+
+  const scored=cands.map(([r,c])=>{
+    const hs=hist[(isMax?0:1)*BS*BS+r*BS+c];
+    return{r,c,s:moveScore(b,r,c,isMax,aiP)+hs*0.15};
+  });
+  scored.sort((a,x)=>x.s-a.s);
+
+  const kl=killers[depth]||[];
+  const moves=[];
+  for(const[kr,kc]of kl){const i=scored.findIndex(x=>x.r===kr&&x.c===kc);if(i>=0)moves.push(scored.splice(i,1)[0]);}
+  moves.push(...scored);
+  const fin=moves.slice(0,limit);
+
+  let best=isMax?-Infinity:Infinity;
+  let bestFlag=TT_UPPER;
+
+  if(isMax){
+    for(const{r,c}of fin){
+      if(aiP===1&&isForbidden(b,r,c))continue;
+      const nh=h^ZOBRIST[r][c][aiP];
+      b[r][c]=aiP;
+      const v=minimax(b,depth-1+ext,alpha,beta,false,r,c,aiP,nh,aiP,true);
+      b[r][c]=0;
+      if(v>best)best=v;
+      if(v>alpha){alpha=v;bestFlag=TT_EXACT;killers[depth]=[[r,c],...(killers[depth]||[]).slice(0,3)];hist[0*BS*BS+r*BS+c]+=depth*depth;}
+      if(beta<=alpha){bestFlag=TT_LOWER;break;}
+    }
+  }else{
+    for(const{r,c}of fin){
+      if(humanP===1&&isForbidden(b,r,c))continue;
+      const nh=h^ZOBRIST[r][c][humanP];
+      b[r][c]=humanP;
+      const v=minimax(b,depth-1+ext,alpha,beta,true,r,c,humanP,nh,aiP,true);
+      b[r][c]=0;
+      if(v<best)best=v;
+      if(v<beta){beta=v;bestFlag=TT_EXACT;killers[depth]=[[r,c],...(killers[depth]||[]).slice(0,3)];hist[1*BS*BS+r*BS+c]+=depth*depth;}
+      if(beta<=alpha){bestFlag=TT_LOWER;break;}
+    }
+    if(best===Infinity)best=evalBoard(b,aiP);
+  }
+
+  ttStore(h,depth,best,bestFlag);
+  return best;
+}
+
+// ── 메인 AI ───────────────────────────────────────────────
+
+function getAIMove(b,maxDepth,aiP,timeLimitMs){
+  const humanP=aiP===1?2:1;
+  const cands=getCandidates(b);
+  searchDeadline=Date.now()+timeLimitMs;
+  if(cands.length===1)return{move:cands[0],vcf:false};
+
+  // 즉각 승리
+  for(const[r,c]of cands){
+    if(aiP===1&&isForbidden(b,r,c))continue;
+    b[r][c]=aiP;if(checkWin(b,r,c,aiP)){b[r][c]=0;return{move:[r,c],vcf:false};}b[r][c]=0;
+  }
+  // 즉각 방어
+  for(const[r,c]of cands){
+    b[r][c]=humanP;if(checkWin(b,r,c,humanP)){b[r][c]=0;return{move:[r,c],vcf:false};}b[r][c]=0;
+  }
+
+  // AI 즉각 복수위협
+  for(const[r,c]of cands){
+    if(aiP===1&&isForbidden(b,r,c))continue;
+    b[r][c]=aiP;const t=getThreats(b,r,c,aiP);b[r][c]=0;
+    if(t.open4>=2||(t.open4>=1&&t.four>=1)||(t.open4>=1&&t.open3>=1)||t.four>=2)return{move:[r,c],vcf:false};
+  }
+  // 상대 즉각 복수위협 방어
+  for(const[r,c]of cands){
+    b[r][c]=humanP;const t=getThreats(b,r,c,humanP);b[r][c]=0;
+    if(t.open4>=2||(t.open4>=1&&t.four>=1)||(t.open4>=1&&t.open3>=1)||t.four>=2)return{move:[r,c],vcf:false};
+  }
+
+  // VCF 강제승 탐색 (시간의 20%)
+  vcfDeadline=Date.now()+Math.min(1000,timeLimitMs*0.2);
+  const vcfMove=vcfSearch(b,aiP,18);
+  if(vcfMove)return{move:vcfMove,vcf:true};
+
+  // VCT 강제승 탐색 (시간의 25%, open3 포함)
+  if(Date.now()<searchDeadline){
+    vctDeadline=Date.now()+Math.min(1200,(searchDeadline-Date.now())*0.3);
+    const vctMove=vctSearch(b,aiP,12);
+    if(vctMove)return{move:vctMove,vcf:true};
+  }
+
+  // 반복 심화 미니맥스 (수정된 Aspiration Window + NMP 활성)
+  tt.fill(0);killers.fill([]);hist.fill(0);
+  const rootHash=boardHash(b);
+  const scored=cands.map(([r,c])=>({r,c,s:moveScore(b,r,c,true,aiP)}));
+  scored.sort((a,x)=>x.s-a.s);
+  let moves=scored.slice(0,22);
+  let bestMove=[moves[0].r,moves[0].c];
+  let prevBestScore=0;
+
+  for(let d=2;d<=maxDepth;d++){
+    if(Date.now()>searchDeadline)break;
+    let best=-Infinity;
+    const results=[];
+    // Aspiration Window: 이전 깊이 결과 기준 ±200 범위로 탐색
+    const aspW=d>=5?200:Infinity;
+    const aspAlpha=aspW<Infinity?prevBestScore-aspW:-Infinity;
+    const aspBeta =aspW<Infinity?prevBestScore+aspW: Infinity;
+    for(const{r,c}of moves){
+      if(Date.now()>searchDeadline)break;
+      if(aiP===1&&isForbidden(b,r,c))continue;
+      const nh=rootHash^ZOBRIST[r][c][aiP];
+      b[r][c]=aiP;
+      let s=minimax(b,d-1,aspAlpha,aspBeta,false,r,c,aiP,nh,aiP,true);
+      // Aspiration 실패시 전체 탐색
+      if(s<=aspAlpha||s>=aspBeta)
+        s=minimax(b,d-1,-Infinity,Infinity,false,r,c,aiP,nh,aiP,true);
+      b[r][c]=0;
+      results.push({r,c,s});
+      if(s>best){best=s;bestMove=[r,c];}
+    }
+    prevBestScore=best;
+    results.sort((a,x)=>x.s-a.s);
+    moves=results.slice(0,d>=8?8:d>=6?12:16);
+  }
+  return{move:bestMove,vcf:false};
+}
+
+self.onmessage=function(e){
+  const{board,depth,aiPlayer,timeLimitMs}=e.data;
+  self.postMessage(getAIMove(board,depth,aiPlayer,timeLimitMs||5000));
+};
+`;
+
+// ══════════════════════════════════════════════════
+// MAIN GAME
+// ══════════════════════════════════════════════════
+const BS=15,DIRS=[[0,1],[1,0],[1,1],[1,-1]];
+const DEPTH=10,TIME_LIMIT=5000;
+let board,isPlayerTurn,winner,lastMove,moveCount,winnerStones,thinkStart;
+let PLAYER,AI_PLAYER,worker;
+
+function countLine(b,r,c,dr,dc,p){
+  let n=1,oA=0,oB=0;
+  for(let d=1;d<BS;d++){const rr=r+dr*d,cc=c+dc*d;if(rr<0||rr>=BS||cc<0||cc>=BS)break;if(b[rr][cc]===p)n++;else{if(b[rr][cc]===0)oA=1;break;}}
+  for(let d=1;d<BS;d++){const rr=r-dr*d,cc=c-dc*d;if(rr<0||rr>=BS||cc<0||cc>=BS)break;if(b[rr][cc]===p)n++;else{if(b[rr][cc]===0)oB=1;break;}}
+  return{n,o:oA+oB};
+}
+function checkWin(b,r,c,p){
+  for(const[dr,dc]of DIRS){
+    const{n}=countLine(b,r,c,dr,dc,p);
+    if(p===1&&n===5)return true;
+    if(p===2&&n>=5)return true;
+  }
+  return false;
+}
+function isForbidden(b,r,c){
+  const t=b.map(x=>[...x]);t[r][c]=1;
+  for(const[dr,dc]of DIRS){const{n}=countLine(t,r,c,dr,dc,1);if(n>=6)return'장목';}
+  if(checkWin(t,r,c,1))return null;
+  let f=0,th=0;
+  for(const[dr,dc]of DIRS){const{n,o}=countLine(t,r,c,dr,dc,1);if(n===4&&o>=1)f++;if(n===3&&o===2)th++;}
+  if(f>=2)return'4-4';if(th>=2)return'3-3';return null;
+}
+function getWinStones(b,r,c,p){
+  for(const[dr,dc]of DIRS){
+    const st=[[r,c]];
+    for(let d=1;d<5;d++){const rr=r+dr*d,cc=c+dc*d;if(rr<0||rr>=BS||cc<0||cc>=BS||b[rr][cc]!==p)break;st.push([rr,cc]);}
+    for(let d=1;d<5;d++){const rr=r-dr*d,cc=c-dc*d;if(rr<0||rr>=BS||cc<0||cc>=BS||b[rr][cc]!==p)break;st.push([rr,cc]);}
+    if(st.length>=5)return st;
+  }
+  return null;
+}
+function getForbiddenCells(){
+  if(PLAYER!==1||!isPlayerTurn||winner)return new Set();
+  const s=new Set();
+  for(let r=0;r<BS;r++)for(let c=0;c<BS;c++)if(!board[r][c]&&isForbidden(board,r,c))s.add(r+','+c);
+  return s;
+}
+
+function createWorker(){
+  if(worker)worker.terminate();
+  const blob=new Blob([AI_CODE],{type:'application/javascript'});
+  worker=new Worker(URL.createObjectURL(blob));
+  worker.onmessage=function(e){
+    const{move:[ar,ac],vcf}=e.data;
+    document.getElementById('think-time').textContent='AI: '+((Date.now()-thinkStart)/1000).toFixed(1)+'초';
+    board[ar][ac]=AI_PLAYER;lastMove=[ar,ac];moveCount++;
+    const vcfEl=document.getElementById('vcf-badge');
+    if(vcf){vcfEl.style.display='block';setTimeout(()=>vcfEl.style.display='none',4000);}
+    const ws=getWinStones(board,ar,ac,AI_PLAYER);
+    if(ws){winner='AI';winnerStones=ws;}else isPlayerTurn=true;
+    render();setStatus();
+  };
+}
+
+function render(){
+  const grid=document.getElementById('board-grid');
+  const fbd=getForbiddenCells();
+  const cells=grid.querySelectorAll('.cell');
+  for(let r=0;r<BS;r++)for(let c=0;c<BS;c++){
+    const cell=cells[r*BS+c],v=board[r][c];
+    const isLast=lastMove&&lastMove[0]===r&&lastMove[1]===c;
+    const isWin=winnerStones.some(([wr,wc])=>wr===r&&wc===c);
+    cell.innerHTML='';
+    if(v){
+      const s=document.createElement('div');
+      s.className='stone '+(v===1?'black':'white');
+      if(isLast)s.classList.add(v===1?'last-black':'last-white');
+      if(isWin)s.classList.add(v===1?'win-black':'win-white');
+      cell.appendChild(s);
+    }else if(fbd.has(r+','+c)&&!winner){
+      const m=document.createElement('div');m.className='fmark';m.textContent='✕';cell.appendChild(m);
+    }
+  }
+  document.getElementById('move-count').textContent=moveCount+'수';
+}
+
+function setStatus(msg,cls){
+  const el=document.getElementById('status');el.className=cls||'';
+  if(msg){el.textContent=msg;return;}
+  const pn=PLAYER===1?'흑':'백';
+  if(winner==='P'){el.textContent='🏆 당신('+pn+')이 이겼습니다!';el.className='win';}
+  else if(winner==='AI'){el.textContent='🤖 AI가 이겼습니다!';el.className='win';}
+  else if(!isPlayerTurn){el.textContent='🔬 AI 사고 중... (깊이10 · VCF · 패턴분석)';el.className='thinking pulsing';}
+  else{el.textContent=(PLAYER===1?'⚫':'⚪')+' 당신의 차례 ('+pn+')';}
+}
+
+function initBoardUI(){
+  const svg=document.getElementById('board-svg'),size=BS*34;
+  svg.setAttribute('width',size);svg.setAttribute('height',size);
+  let sh='';
+  for(let i=0;i<BS;i++){
+    sh+='<line x1="'+(17+i*34)+'" y1="17" x2="'+(17+i*34)+'" y2="'+(17+(BS-1)*34)+'" stroke="rgba(80,40,0,0.5)" stroke-width="1"/>';
+    sh+='<line x1="17" y1="'+(17+i*34)+'" x2="'+(17+(BS-1)*34)+'" y2="'+(17+i*34)+'" stroke="rgba(80,40,0,0.5)" stroke-width="1"/>';
+  }
+  [[3,3],[3,11],[7,7],[11,3],[11,11]].forEach(([r,c])=>{
+    sh+='<circle cx="'+(17+c*34)+'" cy="'+(17+r*34)+'" r="3.5" fill="rgba(80,40,0,0.6)"/>';
+  });
+  svg.innerHTML=sh;
+  const colStr='ABCDEFGHJKLMNOP',cl=document.getElementById('col-labels');cl.innerHTML='';
+  for(let i=0;i<BS;i++){const d=document.createElement('div');d.className='col-label';d.textContent=colStr[i];cl.appendChild(d);}
+  const rl=document.getElementById('row-labels');rl.innerHTML='';
+  for(let i=0;i<BS;i++){const d=document.createElement('div');d.className='row-label';d.textContent=BS-i;rl.appendChild(d);}
+  const grid=document.getElementById('board-grid');grid.innerHTML='';
+  for(let r=0;r<BS;r++)for(let c=0;c<BS;c++){
+    const cell=document.createElement('div');cell.className='cell';
+    cell.addEventListener('click',()=>handleClick(r,c));grid.appendChild(cell);
+  }
+}
+
+function handleClick(r,c){
+  if(!isPlayerTurn||board[r][c]||winner)return;
+  if(PLAYER===1){
+    const fb=isForbidden(board,r,c);
+    if(fb){setStatus('🚫 금수! ('+fb+')','forbidden');setTimeout(()=>setStatus(),1500);return;}
+  }
+  board[r][c]=PLAYER;lastMove=[r,c];moveCount++;
+  const ws=getWinStones(board,r,c,PLAYER);
+  if(ws){winner='P';winnerStones=ws;render();setStatus();return;}
+  isPlayerTurn=false;render();setStatus();
+  thinkStart=Date.now();
+  worker.postMessage({board:board.map(x=>[...x]),depth:DEPTH,aiPlayer:AI_PLAYER,timeLimitMs:TIME_LIMIT});
+}
+
+function resetGame(){
+  board=Array(BS).fill(null).map(()=>Array(BS).fill(0));
+  isPlayerTurn=true;winner=null;lastMove=null;moveCount=0;winnerStones=[];
+  document.getElementById('think-time').textContent='';
+  document.getElementById('vcf-badge').style.display='none';
+
+  if(AI_PLAYER===1){
+    isPlayerTurn=false;
+    createWorker();render();
+    setStatus('🔬 AI(흑) 첫 수 계산 중...','thinking pulsing');
+    setTimeout(()=>{
+      thinkStart=Date.now();
+      worker.postMessage({board:board.map(x=>[...x]),depth:DEPTH,aiPlayer:AI_PLAYER,timeLimitMs:2000});
+    },100);
+  }else{
+    createWorker();render();setStatus();
+  }
+}
+
+function startGame(playerColor){
+  PLAYER=playerColor;AI_PLAYER=playerColor===1?2:1;
+  document.getElementById('mode-screen').style.display='none';
+  document.getElementById('game-screen').style.display='flex';
+
+  document.getElementById('gsub').textContent=
+    PLAYER===1
+      ? '당신(흑,금수) vs AI(백) · 깊이10 · VCF · 5초사고'
+      : 'AI(흑,선공) vs 당신(백) · 깊이10 · VCF · 5초사고';
+
+  const legend=document.getElementById('legend');
+  if(PLAYER===1){
+    legend.innerHTML=
+      '<div class="legend-item"><div class="ldot" style="background:radial-gradient(circle at 33% 33%,#999,#111)"></div> 나 (흑, 금수)</div>'+
+      '<div class="legend-item"><div class="ldot" style="background:radial-gradient(circle at 33% 33%,#fff,#aaa);border:1px solid #ccc"></div> AI (백)</div>'+
+      '<div class="legend-item"><div class="ldot" style="background:rgba(255,50,50,.14);border:1.5px solid rgba(255,60,60,.38);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,80,80,.7)">✕</div> 흑 금수</div>';
+  }else{
+    legend.innerHTML=
+      '<div class="legend-item"><div class="ldot" style="background:radial-gradient(circle at 33% 33%,#999,#111)"></div> AI (흑, 선공)</div>'+
+      '<div class="legend-item"><div class="ldot" style="background:radial-gradient(circle at 33% 33%,#fff,#aaa);border:1px solid #ccc"></div> 나 (백, 장목 승리)</div>';
+  }
+
+  initBoardUI();
+  resetGame();
+}
+
+document.getElementById('btn-new').addEventListener('click',resetGame);
+document.getElementById('btn-mode').addEventListener('click',()=>{
+  if(worker)worker.terminate();
+  document.getElementById('game-screen').style.display='none';
+  document.getElementById('mode-screen').style.display='flex';
+});
+</script>
+</body>
+</html>
