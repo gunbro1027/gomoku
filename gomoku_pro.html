@@ -234,6 +234,15 @@ function countBoardO3(b,p){
   }
   return n;
 }
+// 보드 전체에 해당 플레이어의 four/open4 존재 여부 (VCF 무효화용)
+function hasBoardFour(b,p){
+  for(let r=0;r<BS;r++)for(let c=0;c<BS;c++){
+    if(b[r][c]!==p)continue;
+    const t=getThreats(b,r,c,p);
+    if(t.open4||t.four)return true;
+  }
+  return false;
+}
 
 function scoreThreats(t){
   if(t.five)return 10000000;
@@ -393,7 +402,9 @@ function vcfSearch(b,atk,depth){
       // 수비하면서 4 이상 위협 동시 생성 → VCF 경로 무효
       const dt=getThreats(b,br,bc,def);
       if(dt.open4||dt.four){b[br][bc]=0;allFail=false;break;}
-      // 보드 전체 open3 누적 ≥ 1.5라인(신호 5+) → VCF/VCT 경로 무효
+      // 보드 전체 four/open4 존재 → VCF 무효 (누적된 타지역 위협)
+      if(hasBoardFour(b,def)){b[br][bc]=0;allFail=false;break;}
+      // 보드 전체 open3 누적 ≥ 1.5라인(신호 5+) → VCF 경로 무효
       if(countBoardO3(b,def)>=5){b[br][bc]=0;allFail=false;break;}
       const res=vcfSearch(b,atk,depth-1);
       b[br][bc]=0;
@@ -482,8 +493,10 @@ function vctSearch(b,atk,depth){
       // 수비하면서 4 이상 위협 동시 생성 → VCT 경로 무효
       const dt=getThreats(b,br,bc,def);
       if(dt.open4||dt.four){b[br][bc]=0;allFail=false;break;}
-      // 보드 전체 open3 누적 ≥ 2라인(신호 6+) → VCT 경로 무효
-      if(countBoardO3(b,def)>=6){b[br][bc]=0;allFail=false;break;}
+      // 보드 전체 four/open4 존재 → VCT 무효 (누적된 타지역 위협)
+      if(hasBoardFour(b,def)){b[br][bc]=0;allFail=false;break;}
+      // 보드 전체 open3 누적 ≥ 1.5라인(신호 5+) → VCT 경로 무효
+      if(countBoardO3(b,def)>=5){b[br][bc]=0;allFail=false;break;}
       const res=vctSearch(b,atk,depth-1);
       b[br][bc]=0;
       if(!res){allFail=false;break;}
@@ -695,10 +708,13 @@ function getAIMove(b,maxDepth,aiP,timeLimitMs){
     }
   }
 
-  // VCF 강제승 탐색 (시간의 20%)
-  vcfDeadline=Date.now()+Math.min(1000,timeLimitMs*0.2);
-  const vcfMove=vcfSearch(b,aiP,18);
-  if(vcfMove)return{move:vcfMove,vcf:true};
+  // VCF 전 상대 보드 four 존재시 스킵 (안전장치: 즉각방어가 잡았어야 하나 보험)
+  if(!hasBoardFour(b,humanP)){
+    // VCF 강제승 탐색 (시간의 20%)
+    vcfDeadline=Date.now()+Math.min(1000,timeLimitMs*0.2);
+    const vcfMove=vcfSearch(b,aiP,18);
+    if(vcfMove)return{move:vcfMove,vcf:true};
+  }
 
   // VCT 강제승 탐색 (시간의 25%, open3 포함)
   if(Date.now()<searchDeadline){
