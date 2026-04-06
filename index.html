@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>오목</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  min-height:100vh;
+  background:radial-gradient(ellipse at 50% 30%,#1a1428 0%,#0a0810 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:'Noto Sans KR',sans-serif;padding:40px 20px;gap:40px;
+}
+.title{
+  font-size:42px;font-weight:900;letter-spacing:14px;font-family:serif;
+  background:linear-gradient(135deg,#c8a060 0%,#f0d090 50%,#c8a060 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 0 24px rgba(200,160,80,0.5));
+  text-align:center;
+}
+.sub{font-size:11px;letter-spacing:4px;color:#5040a0;text-align:center;margin-top:6px;}
+.cards{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;}
+.card{
+  width:200px;border-radius:16px;padding:32px 20px;
+  display:flex;flex-direction:column;align-items:center;gap:16px;
+  cursor:pointer;text-decoration:none;transition:all .2s;
+  border:2px solid rgba(200,160,80,.2);
+  background:rgba(255,255,255,.04);
+}
+.card:hover{transform:translateY(-6px);box-shadow:0 16px 48px rgba(0,0,0,.6);border-color:rgba(200,160,80,.5);}
+.stone-wrap{display:flex;gap:6px;align-items:center;}
+.stone{width:36px;height:36px;border-radius:50%;box-shadow:0 4px 12px rgba(0,0,0,.5);}
+.s-black{background:radial-gradient(circle at 33% 33%,#999,#111);}
+.s-white{background:radial-gradient(circle at 33% 33%,#fff,#aaa);}
+.card-title{font-size:16px;font-weight:700;letter-spacing:2px;color:#e0d0a0;}
+.card-desc{font-size:10px;color:#6050a0;text-align:center;line-height:1.7;letter-spacing:1px;}
+.badge{
+  font-size:9px;font-weight:700;letter-spacing:2px;
+  border-radius:20px;padding:3px 12px;
+}
+.badge-normal{background:rgba(80,80,160,.3);color:#8080d0;border:1px solid rgba(80,80,160,.4);}
+.badge-expert{background:rgba(120,20,30,.4);color:#e07070;border:1px solid rgba(180,40,50,.4);}
+</style>
+</head>
+<body>
+
+<div>
+  <div class="title">오 목</div>
+  <div class="sub">GOMOKU · gunbro1027</div>
+</div>
+
+<div class="cards">
+  <a class="card" href="gomoku_black.html">
+    <div class="stone-wrap">
+      <div class="stone s-black"></div>
+    </div>
+    <div class="badge badge-normal">NORMAL</div>
+    <div class="card-title">흑 플레이</div>
+    <div class="card-desc">내가 흑 · AI가 백<br>금수(33/44/장목) 적용<br>깊이 8</div>
+  </a>
+
+  <a class="card" href="gomoku_white.html">
+    <div class="stone-wrap">
+      <div class="stone s-white"></div>
+    </div>
+    <div class="badge badge-normal">NORMAL</div>
+    <div class="card-title">백 플레이</div>
+    <div class="card-desc">AI가 흑 · 내가 백<br>장목 승리 가능<br>깊이 8</div>
+  </a>
+
+  <a class="card" href="gomoku_pro.html">
+    <div class="stone-wrap">
+      <div class="stone s-black"></div>
+      <div class="stone s-white"></div>
+    </div>
+    <div class="badge badge-expert">EXPERT</div>
+    <div class="card-title">PRO 버전</div>
+    <div class="card-desc">색 선택 가능<br>VCF/VCT 강제승 탐색<br>깊이 10 · NMP · 5초사고</div>
+  </a>
+</div>
+
+</body>
+</html>
