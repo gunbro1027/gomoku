@@ -237,8 +237,8 @@ function scoreThreats(t){
   if(t.open3>=2)            s+=500000;
   if(t.open4===1)s+=700000;
   if(t.four===1) s+=150000;
-  if(t.open3===1)s+=32000;
-  if(t.three>=1) s+=5000;
+  if(t.open3===1)s+=50000;  // open3 위협 가중치 강화
+  if(t.three>=1) s+=6000;
   if(t.two>=1)   s+=600;
   return s;
 }
@@ -380,6 +380,9 @@ function vcfSearch(b,atk,depth){
       if(def===1&&isForbidden(b,br,bc)){continue;}
       b[br][bc]=def;
       if(checkWin(b,br,bc,def)){b[br][bc]=0;allFail=false;break;}
+      // 수비하면서 4 이상 위협 동시 생성 → VCF 경로 무효
+      const dt=getThreats(b,br,bc,def);
+      if(dt.open4||dt.four){b[br][bc]=0;allFail=false;break;}
       const res=vcfSearch(b,atk,depth-1);
       b[br][bc]=0;
       if(!res){allFail=false;break;}
@@ -464,6 +467,9 @@ function vctSearch(b,atk,depth){
       if(def===1&&isForbidden(b,br,bc))continue;
       b[br][bc]=def;
       if(checkWin(b,br,bc,def)){b[br][bc]=0;allFail=false;break;}
+      // 수비하면서 4 이상 위협 동시 생성 → VCT 경로 무효
+      const dt=getThreats(b,br,bc,def);
+      if(dt.open4||dt.four){b[br][bc]=0;allFail=false;break;}
       const res=vctSearch(b,atk,depth-1);
       b[br][bc]=0;
       if(!res){allFail=false;break;}
@@ -646,10 +652,10 @@ function getAIMove(b,maxDepth,aiP,timeLimitMs){
     b[r][c]=aiP;const t=getThreats(b,r,c,aiP);b[r][c]=0;
     if(t.open4>=2||(t.open4>=1&&t.four>=1)||(t.open4>=1&&t.open3>=1)||t.four>=2)return{move:[r,c],vcf:false};
   }
-  // 상대 즉각 복수위협 방어
+  // 상대 즉각 복수위협 방어 (양삼·4+3 포함)
   for(const[r,c]of cands){
     b[r][c]=humanP;const t=getThreats(b,r,c,humanP);b[r][c]=0;
-    if(t.open4>=2||(t.open4>=1&&t.four>=1)||(t.open4>=1&&t.open3>=1)||t.four>=2)return{move:[r,c],vcf:false};
+    if(t.open4>=2||(t.open4>=1&&t.four>=1)||(t.open4>=1&&t.open3>=1)||t.four>=2||(t.four>=1&&t.open3>=1)||t.open3>=2)return{move:[r,c],vcf:false};
   }
 
   // VCF 강제승 탐색 (시간의 20%)
