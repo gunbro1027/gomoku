@@ -517,14 +517,34 @@ function minimax(b,depth,alpha,beta,isMax,lr,lc,lp,hash,aiP,allowNull){
 
   let best=isMax?-Infinity:Infinity;
   let bestFlag=TT_UPPER;
+  let moveIdx=0;
 
   if(isMax){
     for(const{r,c}of fin){
       if(aiP===1&&isForbidden(b,r,c))continue;
       const nh=h^ZOBRIST[r][c][aiP];
       b[r][c]=aiP;
-      const v=minimax(b,depth-1+ext,alpha,beta,false,r,c,aiP,nh,aiP,true);
-      b[r][c]=0;
+
+      // LMR: 후순위 비전술 수는 깊이 줄여서 탐색
+      let red=0;
+      if(moveIdx>=3&&depth>=3){
+        const mt=getThreats(b,r,c,aiP);
+        if(!mt.open4&&!mt.four&&!mt.open3)red=moveIdx>=6?2:1;
+      }
+
+      let v;
+      if(moveIdx===0){
+        // PVS: 첫 수(PV) 전체 창
+        v=minimax(b,depth-1+ext,alpha,beta,false,r,c,aiP,nh,aiP,true);
+      }else{
+        // PVS: 나머지는 null window
+        v=minimax(b,depth-1+ext-red,alpha,alpha+1,false,r,c,aiP,nh,aiP,true);
+        // fail-high 또는 LMR 감소분 검증 → 재탐색
+        if(v>alpha&&(v<beta||red>0))
+          v=minimax(b,depth-1+ext,alpha,beta,false,r,c,aiP,nh,aiP,true);
+      }
+
+      b[r][c]=0;moveIdx++;
       if(v>best)best=v;
       if(v>alpha){alpha=v;bestFlag=TT_EXACT;killers[depth]=[[r,c],...(killers[depth]||[]).slice(0,3)];hist[0*BS*BS+r*BS+c]+=depth*depth;}
       if(beta<=alpha){bestFlag=TT_LOWER;break;}
@@ -534,8 +554,23 @@ function minimax(b,depth,alpha,beta,isMax,lr,lc,lp,hash,aiP,allowNull){
       if(humanP===1&&isForbidden(b,r,c))continue;
       const nh=h^ZOBRIST[r][c][humanP];
       b[r][c]=humanP;
-      const v=minimax(b,depth-1+ext,alpha,beta,true,r,c,humanP,nh,aiP,true);
-      b[r][c]=0;
+
+      let red=0;
+      if(moveIdx>=3&&depth>=3){
+        const mt=getThreats(b,r,c,humanP);
+        if(!mt.open4&&!mt.four&&!mt.open3)red=moveIdx>=6?2:1;
+      }
+
+      let v;
+      if(moveIdx===0){
+        v=minimax(b,depth-1+ext,alpha,beta,true,r,c,humanP,nh,aiP,true);
+      }else{
+        v=minimax(b,depth-1+ext-red,beta-1,beta,true,r,c,humanP,nh,aiP,true);
+        if(v<beta&&(v>alpha||red>0))
+          v=minimax(b,depth-1+ext,alpha,beta,true,r,c,humanP,nh,aiP,true);
+      }
+
+      b[r][c]=0;moveIdx++;
       if(v<best)best=v;
       if(v<beta){beta=v;bestFlag=TT_EXACT;killers[depth]=[[r,c],...(killers[depth]||[]).slice(0,3)];hist[1*BS*BS+r*BS+c]+=depth*depth;}
       if(beta<=alpha){bestFlag=TT_LOWER;break;}
