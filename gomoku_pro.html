@@ -53,7 +53,7 @@ body{
 #status.win{color:#ffd700;border-color:rgba(255,215,0,.4);}
 #status.thinking{color:#80a8ff;border-color:rgba(80,120,255,.3);}
 #vcf-badge{
-  display:none;background:rgba(180,40,40,.18);border:1px solid rgba(220,60,60,.4);
+  visibility:hidden;background:rgba(180,40,40,.18);border:1px solid rgba(220,60,60,.4);
   border-radius:20px;padding:4px 18px;font-size:11px;color:#f07070;letter-spacing:2px;
 }
 .board-wrap{
@@ -794,7 +794,7 @@ function createWorker(){
     document.getElementById('think-time').textContent='AI: '+((Date.now()-thinkStart)/1000).toFixed(1)+'초';
     board[ar][ac]=AI_PLAYER;lastMove=[ar,ac];moveCount++;
     const vcfEl=document.getElementById('vcf-badge');
-    if(vcf){vcfEl.style.display='block';setTimeout(()=>vcfEl.style.display='none',4000);}
+    if(vcf){vcfEl.style.visibility='visible';setTimeout(()=>vcfEl.style.visibility='hidden',4000);}
     const ws=getWinStones(board,ar,ac,AI_PLAYER);
     if(ws){winner='AI';winnerStones=ws;}else isPlayerTurn=true;
     render();setStatus();
@@ -874,7 +874,7 @@ function resetGame(){
   board=Array(BS).fill(null).map(()=>Array(BS).fill(0));
   isPlayerTurn=true;winner=null;lastMove=null;moveCount=0;winnerStones=[];
   document.getElementById('think-time').textContent='';
-  document.getElementById('vcf-badge').style.display='none';
+  document.getElementById('vcf-badge').style.visibility='hidden';
 
   if(AI_PLAYER===1){
     isPlayerTurn=false;
