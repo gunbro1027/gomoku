@@ -226,6 +226,15 @@ function getThreats(b,r,c,p){
   return{five,open4,four,open3,three,two};
 }
 
+// 보드 전체 특정 플레이어의 open3 신호 합산 (약 3 = open3 라인 1개)
+function countBoardO3(b,p){
+  let n=0;
+  for(let r=0;r<BS;r++)for(let c=0;c<BS;c++){
+    if(b[r][c]===p)n+=getThreats(b,r,c,p).open3;
+  }
+  return n;
+}
+
 function scoreThreats(t){
   if(t.five)return 10000000;
   let s=0;
@@ -383,6 +392,8 @@ function vcfSearch(b,atk,depth){
       // 수비하면서 4 이상 위협 동시 생성 → VCF 경로 무효
       const dt=getThreats(b,br,bc,def);
       if(dt.open4||dt.four){b[br][bc]=0;allFail=false;break;}
+      // 보드 전체 open3 누적 ≥ 2라인(신호 6+) → VCF 경로 무효
+      if(countBoardO3(b,def)>=6){b[br][bc]=0;allFail=false;break;}
       const res=vcfSearch(b,atk,depth-1);
       b[br][bc]=0;
       if(!res){allFail=false;break;}
@@ -470,6 +481,8 @@ function vctSearch(b,atk,depth){
       // 수비하면서 4 이상 위협 동시 생성 → VCT 경로 무효
       const dt=getThreats(b,br,bc,def);
       if(dt.open4||dt.four){b[br][bc]=0;allFail=false;break;}
+      // 보드 전체 open3 누적 ≥ 2라인(신호 6+) → VCT 경로 무효
+      if(countBoardO3(b,def)>=6){b[br][bc]=0;allFail=false;break;}
       const res=vctSearch(b,atk,depth-1);
       b[br][bc]=0;
       if(!res){allFail=false;break;}
@@ -656,6 +669,17 @@ function getAIMove(b,maxDepth,aiP,timeLimitMs){
   for(const[r,c]of cands){
     b[r][c]=humanP;const t=getThreats(b,r,c,humanP);b[r][c]=0;
     if(t.open4>=2||(t.open4>=1&&t.four>=1)||(t.open4>=1&&t.open3>=1)||t.four>=2||(t.four>=1&&t.open3>=1)||t.open3>=2)return{move:[r,c],vcf:false};
+  }
+
+  // 상대 보드 누적 open3 위협: 기존 open3 존재시 추가 위협 즉각 차단 (양삼 분산 방어)
+  {
+    const baseO3=countBoardO3(b,humanP);
+    if(baseO3>=3){ // 이미 1개 이상 open3 라인 존재
+      for(const[r,c]of cands){
+        b[r][c]=humanP;const t=getThreats(b,r,c,humanP);b[r][c]=0;
+        if(t.open3>=1||t.four>=1||t.open4>=1)return{move:[r,c],vcf:false};
+      }
+    }
   }
 
   // VCF 강제승 탐색 (시간의 20%)
