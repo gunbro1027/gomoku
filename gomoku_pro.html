@@ -780,6 +780,14 @@ function getAIMove(b,maxDepth,aiP,timeLimitMs){
   // 2-ply fork prevention: if opponent plays X giving open3, and then Y gives fork, preempt X
   for(const[r,c]of cands){
     if(checkWin(b,r,c,humanP))continue;
+    // skip if not adjacent to existing opponent stone (prevents gap/split false positives)
+    let adj=false;
+    for(let dr=-1;dr<=1&&!adj;dr++)for(let dc=-1;dc<=1&&!adj;dc++){
+      if(!dr&&!dc)continue;
+      const ar=r+dr,ac=c+dc;
+      if(ar>=0&&ar<BS&&ac>=0&&ac<BS&&b[ar][ac]===humanP)adj=true;
+    }
+    if(!adj)continue;
     b[r][c]=humanP;
     const t1=getThreats(b,r,c,humanP);
     if(t1.open3>=1||t1.four>=1){
