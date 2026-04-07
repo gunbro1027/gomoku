@@ -730,27 +730,21 @@ function getAIMove(b,maxDepth,aiP,timeLimitMs){
       }
       return{move:hWins[0],vcf:false}; // 막을 수 없으면 첫 번째 막기
     }
-    if(hWins.length===1)return{move:hWins[0],vcf:false};
-  }
-
-  // 5목 막은 뒤에도 open4+four 복합 위협이 남아있으면 선처리
-  {
-    let fiveBlock=null;
-    for(const[r,c]of cands){b[r][c]=humanP;const w=checkWin(b,r,c,humanP);b[r][c]=0;if(w){fiveBlock=[r,c];break;}}
-    if(fiveBlock){
-      const tmpB=b.map(x=>[...x]);tmpB[fiveBlock[0]][fiveBlock[1]]=aiP;
+    if(hWins.length===1){
+      const[hr,hc]=hWins[0];
+      const tmpB=b.map(x=>[...x]);tmpB[hr][hc]=aiP;
       const rCands=getCandidates(tmpB);
       for(const[r2,c2]of rCands){
         tmpB[r2][c2]=humanP;const t2=getThreats(tmpB,r2,c2,humanP);tmpB[r2][c2]=0;
         if(t2.open4>=2||(t2.open4>=1&&t2.four>=1)){
-          // 5목 막아도 double open4 포크 → 대신 포크 위치 차단
           if(!checkWin(b,r2,c2,humanP))return{move:[r2,c2],vcf:false};
         }
       }
+      return{move:[hr,hc],vcf:false};
     }
   }
 
-  // 상대 단독 open4 즉각 차단 (1수 후 2방향 승리 가능 → AI 공격보다 우선)
+  // op4list: single/double open4 defense
   {
     // open4 탐지: 복수 위치면 double-open4 위기 상황
     const op4list=[];
@@ -781,6 +775,23 @@ function getAIMove(b,maxDepth,aiP,timeLimitMs){
   for(const[r,c]of cands){
     b[r][c]=humanP;const t=getThreats(b,r,c,humanP);b[r][c]=0;
     if(t.four>=2||(t.four>=1&&t.open3>=1)||t.open3>=2)return{move:[r,c],vcf:false};
+  }
+
+  // 2-ply fork prevention: if opponent plays X giving open3, and then Y gives fork, preempt X
+  for(const[r,c]of cands){
+    if(checkWin(b,r,c,humanP))continue;
+    b[r][c]=humanP;
+    const t1=getThreats(b,r,c,humanP);
+    if(t1.open3>=1||t1.four>=1){
+      let fork2=false;
+      const nc=getCandidates(b);
+      for(const[r2,c2]of nc){
+        b[r2][c2]=humanP;const t2=getThreats(b,r2,c2,humanP);b[r2][c2]=0;
+        if(t2.open4>=1||(t2.four>=1&&t2.open3>=1)){fork2=true;break;}
+      }
+      if(fork2){b[r][c]=0;return{move:[r,c],vcf:false};}
+    }
+    b[r][c]=0;
   }
 
   // 상대 보드 누적 위협 방어
